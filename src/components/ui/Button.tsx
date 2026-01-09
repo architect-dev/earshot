@@ -90,7 +90,7 @@ export function Button({
       {loading ? (
         <ActivityIndicator size="small" color={theme.colors[variantStyles.textColor]} />
       ) : (
-        <Text weight="semibold" color={variantStyles.textColor} style={styles.text}>
+        <Text size="sm" weight="semibold" color={variantStyles.textColor} style={styles.text}>
           [{title.toUpperCase()}]
         </Text>
       )}
@@ -100,13 +100,13 @@ export function Button({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderRadius: 0, // Sharp corners
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 36,
   },
   fullWidth: {
     width: '100%',

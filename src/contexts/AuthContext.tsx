@@ -1,8 +1,28 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { auth, signIn, signUp, signOut, resetPassword, resendVerificationEmail } from '@/services/firebase';
-import { COLLECTIONS, getDocument, setDocument, serverTimestamp } from '@/services/firebase';
-import { type User, type CreateUserData } from '@/types';
+import { onAuthStateChanged, type User as FirebaseUser, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import {
+  auth,
+  signIn,
+  signUp,
+  signOut,
+  resetPassword,
+  resendVerificationEmail,
+  changeEmail,
+  changePassword,
+  deleteAccount,
+} from '@/services/firebase';
+import {
+  COLLECTIONS,
+  getDocument,
+  setDocument,
+  updateDocument,
+  deleteDocument,
+  queryDocuments,
+  where,
+  serverTimestamp,
+} from '@/services/firebase';
+import { uploadFile, deleteFile, getProfilePhotoPath } from '@/services/firebase/storage';
+import { type User, type CreateUserData, type UpdateUserData } from '@/types';
 
 interface AuthContextValue {
   // State
@@ -12,13 +32,22 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isEmailVerified: boolean;
 
-  // Actions
+  // Auth Actions
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, userData: CreateUserData) => Promise<void>;
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   refreshUserProfile: () => Promise<void>;
+
+  // Profile Actions
+  updateProfile: (data: UpdateUserData) => Promise<void>;
+  updateProfilePhoto: (imageUri: string) => Promise<void>;
+  updateEmail: (newEmail: string, currentPassword: string) => Promise<void>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  updateUsername: (newUsername: string) => Promise<void>;
+  deleteUserAccount: (currentPassword: string) => Promise<void>;
+  checkUsernameAvailable: (username: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -63,6 +92,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return unsubscribe;
   }, [fetchUserProfile]);
+
+  // Re-authenticate user (required for sensitive operations)
+  const reauthenticate = useCallback(async (currentPassword: string) => {
+    if (!user || !user.email) {
+      throw new Error('No authenticated user');
+    }
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+  }, [user]);
 
   // Login with email and password
   const login = useCallback(async (email: string, password: string) => {
@@ -129,6 +167,137 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [user, fetchUserProfile]);
 
+  // Update profile (fullName)
+  const updateProfile = useCallback(
+    async (data: UpdateUserData) => {
+      if (!user) throw new Error('No authenticated user');
+
+      await updateDocument(COLLECTIONS.USERS, user.uid, data);
+      await fetchUserProfile(user.uid);
+    },
+    [user, fetchUserProfile]
+  );
+
+  // Update profile photo
+  const updateProfilePhoto = useCallback(
+    async (imageUri: string) => {
+      if (!user) throw new Error('No authenticated user');
+
+      // Fetch the image and convert to blob
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+
+      // Upload to Firebase Storage
+      const path = getProfilePhotoPath(user.uid);
+      const downloadUrl = await uploadFile(path, blob, { contentType: 'image/jpeg' });
+
+      // Update Firestore profile
+      await updateDocument(COLLECTIONS.USERS, user.uid, { profilePhotoUrl: downloadUrl });
+      await fetchUserProfile(user.uid);
+    },
+    [user, fetchUserProfile]
+  );
+
+  // Check if username is available
+  const checkUsernameAvailable = useCallback(
+    async (username: string): Promise<boolean> => {
+      const normalizedUsername = username.toLowerCase();
+      const existingUsers = await queryDocuments<User>(COLLECTIONS.USERS, [
+        where('username', '==', normalizedUsername),
+      ]);
+
+      // If no users found, or the only user is the current user, it's available
+      if (existingUsers.length === 0) return true;
+      if (existingUsers.length === 1 && user && existingUsers[0].id === user.uid) return true;
+      return false;
+    },
+    [user]
+  );
+
+  // Update username
+  const updateUsername = useCallback(
+    async (newUsername: string) => {
+      if (!user) throw new Error('No authenticated user');
+
+      const normalizedUsername = newUsername.toLowerCase();
+
+      // Check availability
+      const isAvailable = await checkUsernameAvailable(normalizedUsername);
+      if (!isAvailable) {
+        throw new Error('Username is already taken');
+      }
+
+      await updateDocument(COLLECTIONS.USERS, user.uid, { username: normalizedUsername });
+      await fetchUserProfile(user.uid);
+    },
+    [user, fetchUserProfile, checkUsernameAvailable]
+  );
+
+  // Update email (requires re-authentication)
+  const updateEmail = useCallback(
+    async (newEmail: string, currentPassword: string) => {
+      if (!user) throw new Error('No authenticated user');
+
+      // Re-authenticate first
+      await reauthenticate(currentPassword);
+
+      // Update Firebase Auth email
+      await changeEmail(newEmail);
+
+      // Update Firestore profile
+      await updateDocument(COLLECTIONS.USERS, user.uid, { email: newEmail.toLowerCase() });
+
+      // Send new verification email
+      await resendVerificationEmail();
+
+      await fetchUserProfile(user.uid);
+    },
+    [user, fetchUserProfile, reauthenticate]
+  );
+
+  // Update password (requires re-authentication)
+  const updatePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      if (!user) throw new Error('No authenticated user');
+
+      // Re-authenticate first
+      await reauthenticate(currentPassword);
+
+      // Update password
+      await changePassword(newPassword);
+    },
+    [user, reauthenticate]
+  );
+
+  // Delete account (requires re-authentication)
+  const deleteUserAccount = useCallback(
+    async (currentPassword: string) => {
+      if (!user) throw new Error('No authenticated user');
+
+      // Re-authenticate first
+      await reauthenticate(currentPassword);
+
+      // Delete profile photo if exists
+      if (userProfile?.profilePhotoUrl) {
+        try {
+          const path = getProfilePhotoPath(user.uid);
+          await deleteFile(path);
+        } catch {
+          // Ignore if photo doesn't exist
+        }
+      }
+
+      // Delete Firestore profile
+      await deleteDocument(COLLECTIONS.USERS, user.uid);
+
+      // Delete Firebase Auth account
+      await deleteAccount();
+
+      setUserProfile(null);
+    },
+    [user, userProfile, reauthenticate]
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -142,6 +311,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       sendPasswordReset,
       sendVerificationEmail,
       refreshUserProfile,
+      updateProfile,
+      updateProfilePhoto,
+      updateEmail,
+      updatePassword,
+      updateUsername,
+      deleteUserAccount,
+      checkUsernameAvailable,
     }),
     [
       user,
@@ -155,6 +331,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       sendPasswordReset,
       sendVerificationEmail,
       refreshUserProfile,
+      updateProfile,
+      updateProfilePhoto,
+      updateEmail,
+      updatePassword,
+      updateUsername,
+      deleteUserAccount,
+      checkUsernameAvailable,
     ]
   );
 

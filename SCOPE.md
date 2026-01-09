@@ -17,6 +17,7 @@ Earshot is a minimal social media application that promotes authentic communicat
 
 - No rounded borders — all sharp corners
 - Buttons wrapped in brackets: `[BUTTON TEXT]`
+- No drop shadows — completely flat design
 
 ---
 

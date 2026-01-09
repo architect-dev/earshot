@@ -5,3 +5,4 @@ export { Avatar } from './Avatar';
 export { LoadingSpinner } from './LoadingSpinner';
 export { ScreenContainer } from './ScreenContainer';
 export { Modal } from './Modal';
+export { ConfirmModal } from './ConfirmModal';
