@@ -3,7 +3,7 @@ import { View, FlatList, StyleSheet, RefreshControl, Alert, ActivityIndicator } 
 import { useRouter } from 'expo-router';
 import { type DocumentSnapshot } from 'firebase/firestore';
 import { ScreenContainer, Text, PageHeader, Modal, Button, ConfirmModal, Spacer } from '@/components/ui';
-import { PostCard } from '@/components/posts';
+import { PostCard, PostInteractionModal, type InteractionType } from '@/components/posts';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getFeedPosts, deletePost } from '@/services/posts';
@@ -33,6 +33,12 @@ export default function FeedScreen() {
   const [showOptionsModal, setShowOptionsModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Interaction modal state
+  const [interactionPost, setInteractionPost] = useState<PostWithAuthor | null>(null);
+  const [interactionType, setInteractionType] = useState<InteractionType>('heart');
+  const [showInteractionModal, setShowInteractionModal] = useState(false);
+  const [sendingInteraction, setSendingInteraction] = useState(false);
 
   const loadPosts = useCallback(
     async (isRefresh = false) => {
@@ -95,13 +101,35 @@ export default function FeedScreen() {
   };
 
   const handleHeartPress = (post: PostWithAuthor) => {
-    // TODO: Open InteractionModal for heart
-    Alert.alert('Heart', `Send a heart to ${post.author.fullName}?`);
+    setInteractionPost(post);
+    setInteractionType('heart');
+    setShowInteractionModal(true);
   };
 
   const handleCommentPress = (post: PostWithAuthor) => {
-    // TODO: Open InteractionModal for comment
-    Alert.alert('Comment', `Send a comment to ${post.author.fullName}?`);
+    setInteractionPost(post);
+    setInteractionType('comment');
+    setShowInteractionModal(true);
+  };
+
+  const handleSendInteraction = async (_message: string) => {
+    if (!interactionPost || !user) return;
+
+    setSendingInteraction(true);
+    try {
+      // TODO: Implement actual DM sending in Phase 5
+      // await sendDirectMessage(user.uid, interactionPost.authorId, _message, { postId: interactionPost.id });
+
+      setShowInteractionModal(false);
+      setInteractionPost(null);
+
+      const actionType = interactionType === 'heart' ? 'Heart' : 'Comment';
+      Alert.alert('Sent!', `${actionType} sent to ${interactionPost.author.fullName}`);
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    } finally {
+      setSendingInteraction(false);
+    }
   };
 
   const handleAuthorPress = (post: PostWithAuthor) => {
@@ -151,6 +179,11 @@ export default function FeedScreen() {
     setShowOptionsModal(false);
     setShowDeleteConfirm(false);
     setSelectedPost(null);
+  };
+
+  const closeInteractionModal = () => {
+    setShowInteractionModal(false);
+    setInteractionPost(null);
   };
 
   const renderPost = ({ item }: { item: PostWithAuthor }) => (
@@ -213,6 +246,16 @@ export default function FeedScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* Interaction Modal (Heart/Comment) */}
+      <PostInteractionModal
+        visible={showInteractionModal}
+        onClose={closeInteractionModal}
+        onSend={handleSendInteraction}
+        post={interactionPost}
+        type={interactionType}
+        loading={sendingInteraction}
+      />
 
       {/* Post Options Modal */}
       <Modal visible={showOptionsModal} onClose={closeModals} title="Post Options">

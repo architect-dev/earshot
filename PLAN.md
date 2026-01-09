@@ -139,12 +139,11 @@
   - [x] Heart button (hidden for own posts)
   - [x] Comment button (hidden for own posts)
   - [x] Timestamp display (relative < 1 week, absolute >= 1 week)
-- [ ] Build InteractionModal component:
-  - [ ] Quoted content preview (matches DM appearance)
-  - [ ] Heart mode (preview + send)
-  - [ ] Comment mode (text input + send)
-  - [ ] Voice message input option
-  - [ ] [CANCEL] and [SEND] buttons
+- [x] Build InteractionModal component:
+  - [x] Quoted content preview (matches DM appearance)
+  - [x] Heart mode (preview + send)
+  - [x] Comment mode (text input + send)
+  - [x] [CANCEL] and [SEND] buttons
 - [ ] Build MediaViewer (full screen):
   - [ ] Swipeable slides
   - [ ] Pinch-to-zoom
@@ -175,17 +174,11 @@
   - [ ] Message list (reverse chronological)
   - [ ] Text input
   - [ ] Send button
-  - [ ] Photo/video picker
-  - [ ] Voice message recorder
+  - [ ] Photo picker
   - [ ] Message bubbles (sent/received styling)
   - [ ] Read receipts (delivered/read)
   - [ ] Quoted content display (for hearts/comments)
   - [ ] Mute/unmute conversation toggle
-- [ ] Build VoiceRecorder component:
-  - [ ] Record button (hold to record)
-  - [ ] Recording indicator
-  - [ ] Playback preview before send
-  - [ ] Cancel recording
 - [ ] Implement heart-to-DM flow
 - [ ] Implement comment-to-DM flow
 - [ ] Real-time message updates (Firestore listeners)
@@ -239,7 +232,20 @@
 - [ ] Implement rate limiting (Cloud Functions)
 - [ ] Validate all user inputs server-side
 
-### Phase 10: Polish & Testing
+### Phase 10: Voice Messages (Optional)
+
+**Estimated Effort:** 1-2 sessions
+
+- [ ] Build VoiceRecorder component:
+  - [ ] Record button (hold to record)
+  - [ ] Recording indicator
+  - [ ] Playback preview before send
+  - [ ] Cancel recording
+- [ ] Add voice message support to Conversation screen
+- [ ] Voice message playback in message bubbles
+- [ ] Add voice option to InteractionModal
+
+### Phase 11: Polish & Testing
 
 **Estimated Effort:** 2-3 sessions
 
@@ -254,7 +260,7 @@
 - [ ] Test on physical Android device
 - [ ] Performance optimization (memo, virtualized lists)
 
-### Phase 11: Beta Deployment
+### Phase 12: Beta Deployment
 
 **Estimated Effort:** 1-2 sessions
 
