@@ -35,60 +35,60 @@
 
 ## Development Phases
 
-### Phase 0: Project Setup
+### Phase 0: Project Setup ✅
 
 **Estimated Effort:** 1-2 sessions
 
-- [ ] Initialize Expo project
-- [ ] Configure TypeScript
-- [ ] Set up project structure (folders, aliases)
-- [ ] Set up Rose Pine theme (dark/light)
-- [ ] Configure ESLint + Prettier
-- [ ] Create base reusable components
-  - [ ] Button (variants: primary, secondary, success, error, ghost; bracket style `[TEXT]`)
-  - [ ] TextInput (with validation states)
-  - [ ] Avatar (with grey fallback)
-  - [ ] LoadingSpinner
-  - [ ] ScreenContainer
-  - [ ] Modal (sharp corners, consistent styling)
+- [x] Initialize Expo project
+- [x] Configure TypeScript
+- [x] Set up project structure (folders, aliases)
+- [x] Set up Rose Pine theme (dark/light)
+- [x] Configure ESLint + Prettier
+- [x] Create base reusable components
+  - [x] Button (variants: primary, secondary, success, error, ghost; bracket style `[TEXT]`)
+  - [x] TextInput (with validation states)
+  - [x] Avatar (with grey fallback)
+  - [x] LoadingSpinner
+  - [x] ScreenContainer
+  - [x] Modal (sharp corners, consistent styling)
 
-### Phase 1: Firebase & Authentication
+### Phase 1: Firebase & Authentication ✅
 
 **Estimated Effort:** 2-3 sessions
 
-- [ ] Create Firebase project
-- [ ] Configure Firebase Auth
-- [ ] Configure Firestore
-- [ ] Configure Firebase Storage
-- [ ] Set up Firestore security rules (initial)
-- [ ] Set up Storage security rules (initial)
-- [ ] Implement AuthContext
-- [ ] Build screens:
-  - [ ] Welcome screen (first launch)
-  - [ ] Login screen
-  - [ ] Signup screen
-  - [ ] Email verification screen
-  - [ ] Password reset screen
-- [ ] Implement auth state persistence
-- [ ] Implement logout functionality
+- [x] Create Firebase project
+- [x] Configure Firebase Auth
+- [x] Configure Firestore
+- [x] Configure Firebase Storage
+- [x] Set up Firestore security rules (initial)
+- [x] Set up Storage security rules (initial)
+- [x] Implement AuthContext
+- [x] Build screens:
+  - [x] Welcome screen (first launch)
+  - [x] Login screen
+  - [x] Signup screen
+  - [x] Email verification screen
+  - [x] Password reset screen
+- [x] Implement auth state persistence
+- [x] Implement logout functionality
 
-### Phase 2: User Profile
+### Phase 2: User Profile ✅
 
 **Estimated Effort:** 1-2 sessions
 
-- [ ] Create User collection in Firestore
-- [ ] Username uniqueness check
-- [ ] Profile photo upload to Storage
-- [ ] Build Profile tab:
-  - [ ] View profile
-  - [ ] Edit full name
-  - [ ] Edit profile photo
-  - [ ] Change email (with re-verification)
-  - [ ] Change password
-  - [ ] Change username (with uniqueness check)
-  - [ ] Dark/Light theme toggle
-  - [ ] Logout button
-  - [ ] Delete account (with confirmation)
+- [x] Create User collection in Firestore
+- [x] Username uniqueness check
+- [x] Profile photo upload to Storage
+- [x] Build Profile tab:
+  - [x] View profile
+  - [x] Edit full name
+  - [x] Edit profile photo
+  - [x] Change email (with re-verification)
+  - [x] Change password
+  - [x] Change username (with uniqueness check)
+  - [x] Dark/Light theme toggle
+  - [x] Logout button
+  - [x] Delete account (with confirmation)
 
 ### Phase 3: Friends System
 
@@ -209,7 +209,17 @@
 - [ ] Configure Sentry
 - [ ] Test crash reporting
 
-### Phase 8: Security Hardening
+### Phase 8: Online Presence
+
+**Estimated Effort:** 1 session
+
+- [ ] Implement lastSeen heartbeat (update every 60 seconds when app active)
+- [ ] Add AppState listener to track foreground/background
+- [ ] Update FriendRow to show online indicator (green dot if lastSeen < 2 min)
+- [ ] Show "Last seen X ago" for offline friends
+- [ ] Add usePresence hook for heartbeat management
+
+### Phase 9: Security Hardening
 
 **Estimated Effort:** 1-2 sessions
 
@@ -221,7 +231,7 @@
 - [ ] Implement rate limiting (Cloud Functions)
 - [ ] Validate all user inputs server-side
 
-### Phase 9: Polish & Testing
+### Phase 10: Polish & Testing
 
 **Estimated Effort:** 2-3 sessions
 
@@ -236,7 +246,7 @@
 - [ ] Test on physical Android device
 - [ ] Performance optimization (memo, virtualized lists)
 
-### Phase 10: Beta Deployment
+### Phase 11: Beta Deployment
 
 **Estimated Effort:** 1-2 sessions
 

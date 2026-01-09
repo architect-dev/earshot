@@ -194,6 +194,7 @@ When user taps heart or comment, a modal opens:
 **Features:**
 
 - View current friends list (max 150)
+- Online indicator for friends (green dot if lastSeen < 2 minutes)
 - Fuzzy search existing friends list (for managing friends)
 - Search for new users by exact username
 - Send friend requests
@@ -257,6 +258,7 @@ When user taps heart or comment, a modal opens:
   updatedAt: timestamp
   friendCount: number
   blockedUsers: string[] (UIDs)
+  lastSeen: timestamp | null
 }
 ```
 

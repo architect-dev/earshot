@@ -9,6 +9,7 @@ export interface User {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   friendCount: number;
+  lastSeen: Timestamp | null;
 }
 
 export interface CreateUserData {

@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { View, Pressable, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
-import { ScreenContainer, Text, Button, Avatar, TextInput, Modal, ConfirmModal } from '@/components/ui';
+import { ScreenContainer, Text, Button, Avatar, TextInput, Modal } from '@/components/ui';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { getFirebaseErrorMessage } from '@/utils/errors';
+import { getAuthErrorMessage, getFirebaseErrorCode } from '@/utils/errors';
 import { validateUsername, validateFullName, validatePassword } from '@/utils/validation';
 
 type EditMode = null | 'fullName' | 'username' | 'email' | 'password';
+
+// Helper to get error message from any error
+const getErrorMessage = (err: unknown): string => {
+  return getAuthErrorMessage(getFirebaseErrorCode(err));
+};
 
 export default function ProfileScreen() {
   const { theme, toggleTheme, themeMode } = useTheme();
@@ -80,16 +85,15 @@ export default function ProfileScreen() {
     if (!result.canceled && result.assets[0]) {
       setIsLoading(true);
       try {
-        // Resize to max 1440px
-        const manipulated = await ImageManipulator.manipulateAsync(
-          result.assets[0].uri,
-          [{ resize: { width: 1440, height: 1440 } }],
-          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-        );
+        // Resize to max 1440px using new API
+        const context = ImageManipulator.manipulate(result.assets[0].uri);
+        context.resize({ width: 1440, height: 1440 });
+        const imageRef = await context.renderAsync();
+        const manipulated = await imageRef.saveAsync({ compress: 0.8, format: SaveFormat.JPEG });
 
         await updateProfilePhoto(manipulated.uri);
       } catch (err) {
-        Alert.alert('Error', getFirebaseErrorMessage(err));
+        Alert.alert('Error', getErrorMessage(err));
       } finally {
         setIsLoading(false);
       }
@@ -98,9 +102,9 @@ export default function ProfileScreen() {
 
   // Save handlers
   const handleSaveFullName = async () => {
-    const validation = validateFullName(fullName);
-    if (!validation.isValid) {
-      setError(validation.error || 'Invalid name');
+    const validationError = validateFullName(fullName);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -110,16 +114,16 @@ export default function ProfileScreen() {
       await updateProfile({ fullName: fullName.trim() });
       closeEdit();
     } catch (err) {
-      setError(getFirebaseErrorMessage(err));
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSaveUsername = async () => {
-    const validation = validateUsername(username);
-    if (!validation.isValid) {
-      setError(validation.error || 'Invalid username');
+    const validationError = validateUsername(username);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -136,7 +140,7 @@ export default function ProfileScreen() {
       await updateUsername(username.trim());
       closeEdit();
     } catch (err) {
-      setError(getFirebaseErrorMessage(err));
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -155,7 +159,7 @@ export default function ProfileScreen() {
       closeEdit();
       Alert.alert('Email Updated', 'Please check your new email for verification.');
     } catch (err) {
-      setError(getFirebaseErrorMessage(err));
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -172,9 +176,9 @@ export default function ProfileScreen() {
       return;
     }
 
-    const validation = validatePassword(newPassword);
-    if (!validation.isValid) {
-      setError(validation.error || 'Invalid password');
+    const validationError = validatePassword(newPassword);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -185,7 +189,7 @@ export default function ProfileScreen() {
       closeEdit();
       Alert.alert('Success', 'Password updated successfully.');
     } catch (err) {
-      setError(getFirebaseErrorMessage(err));
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -196,7 +200,7 @@ export default function ProfileScreen() {
     try {
       await logout();
     } catch (err) {
-      Alert.alert('Error', getFirebaseErrorMessage(err));
+      Alert.alert('Error', getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -212,7 +216,7 @@ export default function ProfileScreen() {
     try {
       await deleteUserAccount(deletePassword);
     } catch (err) {
-      Alert.alert('Error', getFirebaseErrorMessage(err));
+      Alert.alert('Error', getErrorMessage(err));
       setIsLoading(false);
     }
   };
@@ -246,13 +250,25 @@ export default function ProfileScreen() {
         <ProfileRow label="Password" value="••••••••" onEdit={() => openEdit('password')} />
       </View>
 
-      {/* Theme Toggle */}
+      {/* Theme Selector */}
       <View style={styles.section}>
         <View style={styles.row}>
           <Text size="sm" color="subtle">
             Theme
           </Text>
-          <Button title={themeMode.toUpperCase()} variant="ghost" onPress={toggleTheme} />
+          <View style={styles.themeSelector}>
+            <Button
+              title="LIGHT"
+              variant={themeMode === 'light' ? 'primary' : 'ghost'}
+              onPress={() => themeMode !== 'light' && toggleTheme()}
+            />
+            <Text color="muted">/</Text>
+            <Button
+              title="DARK"
+              variant={themeMode === 'dark' ? 'primary' : 'ghost'}
+              onPress={() => themeMode !== 'dark' && toggleTheme()}
+            />
+          </View>
         </View>
       </View>
 
@@ -315,12 +331,7 @@ export default function ProfileScreen() {
 
       {/* Change Password Modal */}
       <Modal visible={editMode === 'password'} onClose={closeEdit} title="Change Password">
-        <TextInput
-          label="Current Password"
-          value={currentPassword}
-          onChangeText={setCurrentPassword}
-          secureTextEntry
-        />
+        <TextInput label="Current Password" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry />
         <TextInput label="New Password" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
         <TextInput
           label="Confirm New Password"
@@ -423,6 +434,11 @@ const styles = StyleSheet.create({
   },
   rowContent: {
     flex: 1,
+  },
+  themeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   spacer: {
     height: 12,
