@@ -8,3 +8,4 @@ export { Modal } from './Modal';
 export { ConfirmModal } from './ConfirmModal';
 export { PageHeader } from './PageHeader';
 export { Spacer } from './Spacer';
+export { UploadProgress, type UploadProgressData } from './UploadProgress';

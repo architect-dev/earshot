@@ -134,9 +134,27 @@ export async function getPostWithAuthor(postId: string): Promise<PostWithAuthor 
 }
 
 /**
- * Update a post's text body
+ * Media item for editing - can be existing or new
  */
-export async function updatePost(postId: string, userId: string, textBody: string | null): Promise<void> {
+export interface EditMediaItem {
+  uri: string;
+  isNew: boolean;
+  storagePath?: string;
+  width?: number;
+  height?: number;
+}
+
+/**
+ * Edit a post - handles text body, media additions, removals, and reordering
+ */
+export async function editPost(
+  postId: string,
+  userId: string,
+  textBody: string | null,
+  mediaItems: EditMediaItem[],
+  deletedPaths: string[],
+  onProgress?: (current: number, total: number) => void
+): Promise<void> {
   const post = await getPost(postId);
   if (!post) {
     throw new Error('Post not found');
@@ -145,8 +163,50 @@ export async function updatePost(postId: string, userId: string, textBody: strin
     throw new Error('You can only edit your own posts');
   }
 
+  // Delete removed media files
+  for (const path of deletedPaths) {
+    try {
+      await deleteFile(path);
+    } catch {
+      // Continue even if delete fails
+      // eslint-disable-next-line no-console
+      console.warn(`Failed to delete media: ${path}`);
+    }
+  }
+
+  // Count new items for progress tracking
+  const newItems = mediaItems.filter((item) => item.isNew);
+  let uploadedCount = 0;
+
+  // Process media items - keep existing, upload new
+  const finalMedia: PostMedia[] = [];
+
+  for (const item of mediaItems) {
+    if (!item.isNew && item.storagePath) {
+      // Existing media - keep as-is
+      finalMedia.push({
+        url: item.uri,
+        storagePath: item.storagePath,
+        width: item.width || 0,
+        height: item.height || 0,
+      });
+    } else if (item.isNew) {
+      // New media - process and upload
+      uploadedCount++;
+      onProgress?.(uploadedCount, newItems.length);
+
+      const { blob, width, height } = await processImage(item.uri);
+      const storagePath = getPostMediaPath(userId, postId, Date.now() + uploadedCount);
+      const url = await uploadFile(storagePath, blob, { contentType: 'image/jpeg' });
+      finalMedia.push({ url, storagePath, width, height });
+    }
+  }
+
+  // Update the post document
   await updateDocument(COLLECTIONS.POSTS, postId, {
     textBody: textBody?.trim() || null,
+    media: finalMedia,
+    updatedAt: serverTimestamp(),
   });
 }
 
