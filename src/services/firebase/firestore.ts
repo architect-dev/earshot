@@ -1,0 +1,153 @@
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  limit,
+  startAfter,
+  onSnapshot,
+  serverTimestamp,
+  type DocumentData,
+  type QueryConstraint,
+  type DocumentReference,
+  type Unsubscribe,
+  Timestamp,
+} from 'firebase/firestore';
+import { db } from './config';
+
+// Collection names
+export const COLLECTIONS = {
+  USERS: 'users',
+  POSTS: 'posts',
+  FRIENDSHIPS: 'friendships',
+  CONVERSATIONS: 'conversations',
+  MESSAGES: 'messages',
+  BLOCKS: 'blocks',
+} as const;
+
+/**
+ * Get a single document by ID
+ */
+export async function getDocument<T>(collectionName: string, docId: string): Promise<T | null> {
+  const docRef = doc(db, collectionName, docId);
+  const docSnap = await getDoc(docRef);
+
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() } as T;
+  }
+  return null;
+}
+
+/**
+ * Create or overwrite a document
+ */
+export async function setDocument(collectionName: string, docId: string, data: DocumentData): Promise<void> {
+  const docRef = doc(db, collectionName, docId);
+  return setDoc(docRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Update specific fields in a document
+ */
+export async function updateDocument(
+  collectionName: string,
+  docId: string,
+  data: Partial<DocumentData>
+): Promise<void> {
+  const docRef = doc(db, collectionName, docId);
+  return updateDoc(docRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Delete a document
+ */
+export async function deleteDocument(collectionName: string, docId: string): Promise<void> {
+  const docRef = doc(db, collectionName, docId);
+  return deleteDoc(docRef);
+}
+
+/**
+ * Query documents with constraints
+ */
+export async function queryDocuments<T>(collectionName: string, constraints: QueryConstraint[]): Promise<T[]> {
+  const collectionRef = collection(db, collectionName);
+  const q = query(collectionRef, ...constraints);
+  const querySnapshot = await getDocs(q);
+
+  return querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as T[];
+}
+
+/**
+ * Subscribe to real-time updates for a document
+ */
+export function subscribeToDocument<T>(
+  collectionName: string,
+  docId: string,
+  callback: (data: T | null) => void
+): Unsubscribe {
+  const docRef = doc(db, collectionName, docId);
+
+  return onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      callback({ id: docSnap.id, ...docSnap.data() } as T);
+    } else {
+      callback(null);
+    }
+  });
+}
+
+/**
+ * Subscribe to real-time updates for a query
+ */
+export function subscribeToQuery<T>(
+  collectionName: string,
+  constraints: QueryConstraint[],
+  callback: (data: T[]) => void
+): Unsubscribe {
+  const collectionRef = collection(db, collectionName);
+  const q = query(collectionRef, ...constraints);
+
+  return onSnapshot(q, (querySnapshot) => {
+    const results = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as T[];
+    callback(results);
+  });
+}
+
+/**
+ * Get document reference for creating new documents
+ */
+export function getDocRef(collectionName: string, docId?: string): DocumentReference {
+  if (docId) {
+    return doc(db, collectionName, docId);
+  }
+  return doc(collection(db, collectionName));
+}
+
+/**
+ * Convert Firestore timestamp to Date
+ */
+export function timestampToDate(timestamp: Timestamp | null | undefined): Date | null {
+  if (!timestamp) return null;
+  return timestamp.toDate();
+}
+
+// Re-export commonly used Firestore functions for convenience
+export { where, orderBy, limit, startAfter, serverTimestamp, Timestamp };

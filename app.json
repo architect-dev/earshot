@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Earshot",
+    "slug": "earshot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "scheme": "earshot",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#191724"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.roguerotkosky.earshot"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#191724"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.roguerotkosky.earshot"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,140 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isEmailVerified() {
+      return isAuthenticated() && request.auth.token.email_verified;
+    }
+    
+    // Check if two users are friends
+    function areFriends(userId1, userId2) {
+      return exists(/databases/$(database)/documents/friendships/$(userId1 + '_' + userId2)) ||
+             exists(/databases/$(database)/documents/friendships/$(userId2 + '_' + userId1));
+    }
+    
+    // Check if user is blocked
+    function isBlocked(blockerId, blockedId) {
+      return exists(/databases/$(database)/documents/blocks/$(blockerId + '_' + blockedId));
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Anyone authenticated can read basic profile info (for friend search)
+      allow read: if isAuthenticated() && isEmailVerified();
+      
+      // Only the owner can create/update their profile
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      
+      // Only the owner can delete their profile
+      allow delete: if isOwner(userId);
+    }
+    
+    // Posts collection
+    match /posts/{postId} {
+      // Users can read posts from friends only
+      allow read: if isAuthenticated() && 
+                    isEmailVerified() && 
+                    (isOwner(resource.data.authorId) || areFriends(request.auth.uid, resource.data.authorId));
+      
+      // Users can create their own posts
+      allow create: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      isOwner(request.resource.data.authorId);
+      
+      // Users can update their own posts
+      allow update: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      isOwner(resource.data.authorId);
+      
+      // Users can delete their own posts
+      allow delete: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      isOwner(resource.data.authorId);
+    }
+    
+    // Friendships collection
+    match /friendships/{friendshipId} {
+      // Participants can read the friendship
+      allow read: if isAuthenticated() && 
+                    isEmailVerified() && 
+                    (request.auth.uid == resource.data.requesterId || 
+                     request.auth.uid == resource.data.addresseeId);
+      
+      // Authenticated users can create friend requests
+      allow create: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      request.auth.uid == request.resource.data.requesterId &&
+                      !isBlocked(request.resource.data.addresseeId, request.auth.uid);
+      
+      // Participants can update (accept/decline)
+      allow update: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      (request.auth.uid == resource.data.requesterId || 
+                       request.auth.uid == resource.data.addresseeId);
+      
+      // Participants can delete friendships
+      allow delete: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      (request.auth.uid == resource.data.requesterId || 
+                       request.auth.uid == resource.data.addresseeId);
+    }
+    
+    // Conversations collection
+    match /conversations/{conversationId} {
+      // Only participants can read/write
+      allow read: if isAuthenticated() && 
+                    isEmailVerified() && 
+                    request.auth.uid in resource.data.participants;
+      
+      allow create: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      request.auth.uid in request.resource.data.participants;
+      
+      allow update: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      request.auth.uid in resource.data.participants;
+      
+      // Messages subcollection
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+        
+        allow create: if isAuthenticated() && 
+                        isEmailVerified() && 
+                        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
+                        request.auth.uid == request.resource.data.senderId;
+        
+        allow update: if isAuthenticated() && 
+                        isEmailVerified() && 
+                        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+      }
+    }
+    
+    // Blocks collection
+    match /blocks/{blockId} {
+      // Only the blocker can read/write blocks
+      allow read: if isAuthenticated() && 
+                    isEmailVerified() && 
+                    request.auth.uid == resource.data.blockerId;
+      
+      allow create: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      request.auth.uid == request.resource.data.blockerId;
+      
+      allow delete: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      request.auth.uid == resource.data.blockerId;
+    }
+  }
+}
+

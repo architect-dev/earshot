@@ -1,0 +1,86 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isEmailVerified() {
+      return isAuthenticated() && request.auth.token.email_verified;
+    }
+    
+    // File size limits
+    function isValidImageSize() {
+      return request.resource.size < 10 * 1024 * 1024; // 10MB max
+    }
+    
+    function isValidVideoSize() {
+      return request.resource.size < 100 * 1024 * 1024; // 100MB max
+    }
+    
+    function isValidAudioSize() {
+      return request.resource.size < 10 * 1024 * 1024; // 10MB max
+    }
+    
+    // Content type checks
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    function isVideo() {
+      return request.resource.contentType.matches('video/.*');
+    }
+    
+    function isAudio() {
+      return request.resource.contentType.matches('audio/.*');
+    }
+    
+    // Profile photos - only owner can read/write
+    match /profile-photos/{userId}/{fileName} {
+      allow read: if isAuthenticated() && isEmailVerified();
+      allow write: if isOwner(userId) && 
+                     isEmailVerified() && 
+                     isImage() && 
+                     isValidImageSize();
+      allow delete: if isOwner(userId) && isEmailVerified();
+    }
+    
+    // Post media - only owner can write, friends can read
+    // Note: Friend check requires Firestore lookup, which isn't available in Storage rules
+    // For now, we allow authenticated users to read (posts are protected at Firestore level)
+    match /post-media/{userId}/{postId}/{fileName} {
+      allow read: if isAuthenticated() && isEmailVerified();
+      allow write: if isOwner(userId) && 
+                     isEmailVerified() && 
+                     (isImage() || isVideo()) &&
+                     (isImage() && isValidImageSize() || isVideo() && isValidVideoSize());
+      allow delete: if isOwner(userId) && isEmailVerified();
+    }
+    
+    // Message media - participants can read/write
+    // Note: Participant check requires Firestore lookup
+    // For now, authenticated users can access (conversations are protected at Firestore level)
+    match /message-media/{conversationId}/{fileName} {
+      allow read: if isAuthenticated() && isEmailVerified();
+      allow write: if isAuthenticated() && 
+                     isEmailVerified() && 
+                     (isImage() || isVideo()) &&
+                     (isImage() && isValidImageSize() || isVideo() && isValidVideoSize());
+    }
+    
+    // Voice messages
+    match /voice-messages/{conversationId}/{fileName} {
+      allow read: if isAuthenticated() && isEmailVerified();
+      allow write: if isAuthenticated() && 
+                     isEmailVerified() && 
+                     isAudio() && 
+                     isValidAudioSize();
+    }
+  }
+}
+
