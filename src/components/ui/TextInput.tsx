@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
-import { TextInput as RNTextInput, View, StyleSheet, type TextInputProps as RNTextInputProps } from 'react-native';
+import {
+  TextInput as RNTextInput,
+  View,
+  Pressable,
+  StyleSheet,
+  type TextInputProps as RNTextInputProps,
+} from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text } from './Text';
 
@@ -12,9 +18,20 @@ interface TextInputProps extends RNTextInputProps {
   validationState?: ValidationState;
 }
 
-export function TextInput({ label, error, hint, validationState = 'default', style, ...props }: TextInputProps) {
+export function TextInput({
+  label,
+  error,
+  hint,
+  validationState = 'default',
+  secureTextEntry,
+  style,
+  ...props
+}: TextInputProps) {
   const { theme } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  const isPassword = secureTextEntry !== undefined;
 
   const getBorderColor = () => {
     if (validationState === 'error' || error) {
@@ -29,6 +46,10 @@ export function TextInput({ label, error, hint, validationState = 'default', sty
     return theme.colors.highlightHigh;
   };
 
+  const togglePasswordVisibility = () => {
+    setIsPasswordVisible((prev) => !prev);
+  };
+
   return (
     <View style={styles.container}>
       {label && (
@@ -36,27 +57,42 @@ export function TextInput({ label, error, hint, validationState = 'default', sty
           {label}
         </Text>
       )}
-      <RNTextInput
-        style={[
-          styles.input,
-          {
-            backgroundColor: theme.colors.surface,
-            borderColor: getBorderColor(),
-            color: theme.colors.text,
-          },
-          style,
-        ]}
-        placeholderTextColor={theme.colors.muted}
-        onFocus={(e) => {
-          setIsFocused(true);
-          props.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setIsFocused(false);
-          props.onBlur?.(e);
-        }}
-        {...props}
-      />
+      <View style={styles.inputWrapper}>
+        <RNTextInput
+          style={[
+            styles.input,
+            isPassword && styles.inputWithToggle,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: getBorderColor(),
+              color: theme.colors.text,
+            },
+            style,
+          ]}
+          placeholderTextColor={theme.colors.muted}
+          secureTextEntry={isPassword && !isPasswordVisible}
+          onFocus={(e) => {
+            setIsFocused(true);
+            props.onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setIsFocused(false);
+            props.onBlur?.(e);
+          }}
+          {...props}
+        />
+        {isPassword && (
+          <Pressable
+            style={[styles.toggleButton, { borderColor: getBorderColor(), backgroundColor: theme.colors.surface }]}
+            onPress={togglePasswordVisibility}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text size="sm" color="muted">
+              {isPasswordVisible ? 'HIDE' : 'SHOW'}
+            </Text>
+          </Pressable>
+        )}
+      </View>
       {error && (
         <Text size="xs" color="love" style={styles.helper}>
           {error}
@@ -78,12 +114,28 @@ const styles = StyleSheet.create({
   label: {
     marginBottom: 6,
   },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
   input: {
+    flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
     borderRadius: 0, // Sharp corners
     fontSize: 16,
+    minHeight: 48,
+  },
+  inputWithToggle: {
+    borderRightWidth: 0,
+  },
+  toggleButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderLeftWidth: 0,
     minHeight: 48,
   },
   helper: {

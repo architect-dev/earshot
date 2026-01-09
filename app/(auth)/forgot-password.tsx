@@ -45,12 +45,17 @@ export default function ForgotPasswordScreen() {
               ))
             </Text>
             <Text size="xl" weight="semibold" align="center">
-              Lorem ipsum
+              Check Your Email
             </Text>
             <Text size="md" color="subtle" align="center" style={styles.successMessage}>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+              We've sent password reset instructions to your email address.
             </Text>
-            <Button title="BACK TO LOGIN" variant="secondary" onPress={() => router.back()} style={styles.backButton} />
+            <Button
+              title="BACK TO SIGN IN"
+              variant="secondary"
+              onPress={() => router.back()}
+              style={styles.backButton}
+            />
           </View>
         </View>
       </ScreenContainer>
@@ -65,10 +70,10 @@ export default function ForgotPasswordScreen() {
             ))
           </Text>
           <Text size="xl" weight="semibold">
-            Lorem ipsum
+            Reset Password
           </Text>
           <Text size="sm" color="subtle" style={styles.subtitle}>
-            Lorem ipsum dolor sit amet
+            Enter your email to receive reset instructions
           </Text>
         </View>
 
@@ -83,7 +88,7 @@ export default function ForgotPasswordScreen() {
 
           <TextInput
             label="Email"
-            placeholder="lorem@ipsum.com"
+            placeholder="you@example.com"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -93,13 +98,13 @@ export default function ForgotPasswordScreen() {
 
           <View style={styles.buttonSpacing} />
 
-          <Button title="RESET PASSWORD" variant="primary" onPress={handleReset} loading={loading} fullWidth />
+          <Button title="SEND RESET LINK" variant="primary" onPress={handleReset} loading={loading} fullWidth />
         </View>
 
         <View style={styles.footer}>
           <Pressable onPress={() => router.back()}>
             <Text size="sm" color="gold" weight="semibold">
-              Lorem ipsum
+              Back to Sign In
             </Text>
           </Pressable>
         </View>

@@ -1,8 +1,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, initializeAuth, browserLocalPersistence } from 'firebase/auth';
+import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Firebase configuration
@@ -28,22 +28,18 @@ const firebaseConfig = {
 // Initialize Firebase (prevent re-initialization)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Auth
-// Note: Firebase Auth automatically persists auth state in React Native
-// We use getAuth for simplicity - persistence works out of the box
+// Initialize Auth with AsyncStorage persistence for React Native
+// This ensures the user stays logged in between app restarts
 let auth: ReturnType<typeof getAuth>;
 
-try {
+if (getApps().length === 1) {
+  // First initialization - use initializeAuth with persistence
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} else {
+  // Already initialized - use getAuth
   auth = getAuth(app);
-} catch {
-  // If getAuth fails (app already initialized with different auth), try initializeAuth
-  if (Platform.OS === 'web') {
-    auth = initializeAuth(app, {
-      persistence: browserLocalPersistence,
-    });
-  } else {
-    auth = initializeAuth(app);
-  }
 }
 
 // Initialize Firestore

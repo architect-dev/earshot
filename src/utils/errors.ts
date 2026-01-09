@@ -1,40 +1,39 @@
 /**
  * Firebase error code to user-friendly message mapping
- * Using lorem ipsum placeholders as per requirements
  */
 
 export function getAuthErrorMessage(errorCode: string): string {
   switch (errorCode) {
     // Sign in errors
     case 'auth/invalid-email':
-      return 'Lorem ipsum invalid email';
+      return 'Please enter a valid email address';
     case 'auth/user-disabled':
-      return 'Lorem ipsum disabled';
+      return 'This account has been disabled';
     case 'auth/user-not-found':
-      return 'Lorem ipsum not found';
+      return 'No account found with this email';
     case 'auth/wrong-password':
-      return 'Lorem ipsum wrong password';
+      return 'Incorrect password';
     case 'auth/invalid-credential':
-      return 'Lorem ipsum invalid credentials';
+      return 'Invalid email or password';
 
     // Sign up errors
     case 'auth/email-already-in-use':
-      return 'Lorem ipsum already exists';
+      return 'An account with this email already exists';
     case 'auth/operation-not-allowed':
-      return 'Lorem ipsum not allowed';
+      return 'This operation is not allowed';
     case 'auth/weak-password':
-      return 'Lorem ipsum weak password';
+      return 'Please choose a stronger password';
 
     // General errors
     case 'auth/network-request-failed':
-      return 'Lorem ipsum network error';
+      return 'Network error. Please check your connection';
     case 'auth/too-many-requests':
-      return 'Lorem ipsum too many requests';
+      return 'Too many attempts. Please try again later';
     case 'auth/requires-recent-login':
-      return 'Lorem ipsum re-login required';
+      return 'Please sign in again to continue';
 
     default:
-      return 'Lorem ipsum error';
+      return 'An error occurred. Please try again';
   }
 }
 

@@ -15,7 +15,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      setError('Lorem ipsum required fields');
+      setError('Please fill in all fields');
       return;
     }
 
@@ -41,7 +41,7 @@ export default function LoginScreen() {
             ))
           </Text>
           <Text size="xl" weight="semibold">
-            Lorem ipsum
+            Sign In
           </Text>
           <Text size="sm" color="subtle" style={styles.subtitle}>
             Lorem ipsum dolor sit amet
@@ -59,7 +59,7 @@ export default function LoginScreen() {
 
           <TextInput
             label="Email"
-            placeholder="lorem@ipsum.com"
+            placeholder="you@example.com"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -80,20 +80,20 @@ export default function LoginScreen() {
 
           <Pressable style={styles.forgotPassword} onPress={() => router.push('/(auth)/forgot-password')}>
             <Text size="sm" color="subtle">
-              Lorem ipsum?
+              Forgot password?
             </Text>
           </Pressable>
 
-          <Button title="LOGIN" variant="primary" onPress={handleLogin} loading={loading} fullWidth />
+          <Button title="SIGN IN" variant="primary" onPress={handleLogin} loading={loading} fullWidth />
         </View>
 
         <View style={styles.footer}>
           <Text size="sm" color="subtle">
-            Lorem ipsum dolor sit amet?{' '}
+            Don't have an account?{' '}
           </Text>
           <Pressable onPress={() => router.push('/(auth)/signup')}>
             <Text size="sm" color="gold" weight="semibold">
-              Lorem ipsum
+              Sign Up
             </Text>
           </Pressable>
         </View>

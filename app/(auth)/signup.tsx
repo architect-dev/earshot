@@ -25,9 +25,9 @@ export default function SignupScreen() {
     if (usernameError) newErrors.username = usernameError;
 
     if (!fullName.trim()) {
-      newErrors.fullName = 'Lorem ipsum required';
+      newErrors.fullName = 'Full name is required';
     } else if (fullName.length > 32) {
-      newErrors.fullName = 'Lorem ipsum max 32';
+      newErrors.fullName = 'Full name must be 32 characters or less';
     }
 
     const emailError = validateEmail(email);
@@ -37,7 +37,7 @@ export default function SignupScreen() {
     if (passwordError) newErrors.password = passwordError;
 
     if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'Lorem ipsum mismatch';
+      newErrors.confirmPassword = 'Passwords do not match';
     }
 
     // Check username uniqueness
@@ -47,7 +47,7 @@ export default function SignupScreen() {
           where('username', '==', username.toLowerCase()),
         ]);
         if (existingUsers.length > 0) {
-          newErrors.username = 'Lorem ipsum already taken';
+          newErrors.username = 'Username is already taken';
         }
       } catch {
         // If query fails, let server-side validation handle it
@@ -87,7 +87,7 @@ export default function SignupScreen() {
             ))
           </Text>
           <Text size="xl" weight="semibold">
-            Lorem ipsum
+            Create Account
           </Text>
           <Text size="sm" color="subtle" style={styles.subtitle}>
             Lorem ipsum dolor sit amet
@@ -105,20 +105,20 @@ export default function SignupScreen() {
 
           <TextInput
             label="Username"
-            placeholder="lorem_ipsum"
+            placeholder="your_username"
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
             autoComplete="username"
             error={errors.username}
-            hint="Lorem ipsum 24 chars, a-z, 0-9, _"
+            hint="Max 24 characters: a-z, 0-9, _"
           />
 
           <View style={styles.inputSpacing} />
 
           <TextInput
             label="Full Name"
-            placeholder="Lorem Ipsum"
+            placeholder="Your Name"
             value={fullName}
             onChangeText={setFullName}
             autoComplete="name"
@@ -129,7 +129,7 @@ export default function SignupScreen() {
 
           <TextInput
             label="Email"
-            placeholder="lorem@ipsum.com"
+            placeholder="you@example.com"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -148,7 +148,7 @@ export default function SignupScreen() {
             secureTextEntry
             autoComplete="new-password"
             error={errors.password}
-            hint="Lorem ipsum 8+ chars, upper, lower, number, special"
+            hint="Min 8 chars: uppercase, lowercase, number, special"
           />
 
           <View style={styles.inputSpacing} />
@@ -170,11 +170,11 @@ export default function SignupScreen() {
 
         <View style={styles.footer}>
           <Text size="sm" color="subtle">
-            Lorem ipsum dolor sit amet?{' '}
+            Already have an account?{' '}
           </Text>
           <Pressable onPress={() => router.back()}>
             <Text size="sm" color="gold" weight="semibold">
-              Lorem ipsum
+              Sign In
             </Text>
           </Pressable>
         </View>

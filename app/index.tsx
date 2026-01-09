@@ -69,14 +69,14 @@ export default function WelcomeScreen() {
             ))
           </Text>
           <Text size="xl" weight="medium" align="center">
-            Lorem ipsum dolor sit amet
+            Welcome to Earshot
           </Text>
           <Text size="md" color="subtle" align="center" style={styles.subtitle}>
-            Earshot
+            Lorem ipsum dolor sit amet
           </Text>
         </View>
         <View style={styles.footer}>
-          <Button title="NEXT" variant="primary" onPress={handleNext} fullWidth />
+          <Button title="GET STARTED" variant="primary" onPress={handleNext} fullWidth />
         </View>
       </View>
     </ScreenContainer>

@@ -36,9 +36,9 @@ export default function VerifyEmailScreen() {
 
     try {
       await sendVerificationEmail();
-      setMessage('Lorem ipsum dolor sit amet'); // Verification email sent
+      setMessage('Verification email sent!');
     } catch {
-      setError('Lorem ipsum error'); // Failed to send
+      setError('Failed to send email. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -57,10 +57,11 @@ export default function VerifyEmailScreen() {
             ))
           </Text>
           <Text size="xl" weight="semibold" align="center">
-            Lorem ipsum
+            Verify Your Email
           </Text>
           <Text size="md" color="subtle" align="center" style={styles.subtitle}>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+            We've sent a verification link to your email address. Please check your inbox and click the link to
+            continue.
           </Text>
           <Text size="sm" color="muted" align="center" style={styles.email}>
             {user?.email}
@@ -80,7 +81,7 @@ export default function VerifyEmailScreen() {
 
           <View style={styles.buttons}>
             <Button title="RESEND EMAIL" variant="primary" onPress={handleResend} loading={loading} fullWidth />
-            <Button title="LOGOUT" variant="ghost" onPress={handleLogout} style={styles.logoutButton} />
+            <Button title="SIGN OUT" variant="ghost" onPress={handleLogout} style={styles.logoutButton} />
           </View>
         </View>
       </View>
