@@ -142,6 +142,18 @@ export function getDocRef(collectionName: string, docId?: string): DocumentRefer
 }
 
 /**
+ * Add a new document with auto-generated ID
+ */
+export async function addDocument(collectionName: string, data: DocumentData): Promise<string> {
+  const docRef = doc(collection(db, collectionName));
+  await setDoc(docRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+/**
  * Convert Firestore timestamp to Date
  */
 export function timestampToDate(timestamp: Timestamp | null | undefined): Date | null {

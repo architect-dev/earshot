@@ -90,41 +90,41 @@
   - [x] Logout button
   - [x] Delete account (with confirmation)
 
-### Phase 3: Friends System
+### Phase 3: Friends System ✅
 
 **Estimated Effort:** 2-3 sessions
 
-- [ ] Create Friendships collection
-- [ ] Create Blocks collection
-- [ ] Implement friend request logic
-- [ ] Implement friend acceptance logic
-- [ ] Implement 150 friend limit validation
-- [ ] Build Friends tab:
-  - [ ] Current friends list
-  - [ ] Fuzzy search existing friends (for managing)
-  - [ ] Search for new users by exact username
-  - [ ] Send friend request
-  - [ ] Pending requests (incoming)
-  - [ ] Pending requests (outgoing)
-  - [ ] Accept/decline requests
-  - [ ] Remove friend
-  - [ ] Block user
-  - [ ] View blocked users
-  - [ ] Unblock user
-- [ ] Build reusable FriendRow component
+- [x] Create Friendships collection
+- [x] Create Blocks collection
+- [x] Implement friend request logic
+- [x] Implement friend acceptance logic
+- [x] Implement 150 friend limit validation
+- [x] Build Friends tab:
+  - [x] Current friends list
+  - [x] Fuzzy search existing friends (for managing)
+  - [x] Search for new users by exact username
+  - [x] Send friend request
+  - [x] Pending requests (incoming)
+  - [x] Pending requests (outgoing)
+  - [x] Accept/decline requests
+  - [x] Remove friend
+  - [x] Block user
+  - [x] View blocked users
+  - [x] Unblock user
+- [x] Build reusable FriendRow component
 
 ### Phase 4: Posts & Feed
 
 **Estimated Effort:** 3-4 sessions
 
-- [ ] Create Posts collection
-- [ ] Implement photo upload (multiple)
-- [ ] Build Create tab:
-  - [ ] Photo picker (up to 6)
-  - [ ] Photo preview/reorder
-  - [ ] Text body input
-  - [ ] Post submission
-  - [ ] Post success feedback
+- [x] Create Posts collection
+- [x] Implement photo upload (multiple)
+- [x] Build Create tab:
+  - [x] Photo picker (up to 6)
+  - [x] Photo preview/reorder
+  - [x] Text body input
+  - [x] Post submission
+  - [x] Post success feedback
 - [ ] Build Feed tab:
   - [ ] Fetch friends' posts
   - [ ] Reverse chronological sort

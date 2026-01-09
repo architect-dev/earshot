@@ -228,7 +228,7 @@ export default function FriendsScreen() {
     <ScreenContainer padded={false}>
       <PageHeader
         title="Friends"
-        rightElement={<Button title="ADD" variant="ghost" onPress={() => setShowAddFriend(true)} />}
+        rightElement={<Button title="ADD" variant="ghost" size="small" onPress={() => setShowAddFriend(true)} />}
         style={styles.header}
       />
 

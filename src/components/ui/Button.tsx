@@ -117,7 +117,7 @@ export function Button({
       {...props}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={theme.colors[variantStyles.textColor]} />
+        <ActivityIndicator size={18} color={theme.colors[variantStyles.textColor]} />
       ) : (
         <Text size={sizeStyles.textSize} weight="semibold" color={variantStyles.textColor} style={styles.text}>
           [{title.toUpperCase()}]
