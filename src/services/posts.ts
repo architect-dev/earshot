@@ -13,6 +13,7 @@ import {
 } from './firebase/firestore';
 import { uploadFile, deleteFile, getPostMediaPath } from './firebase/storage';
 import { type Post, type PostMedia, type PostWithAuthor, type User } from '@/types';
+import { type PhotoItem } from '@/components/posts';
 
 const MAX_PHOTOS = 6;
 const MAX_DIMENSION = 1440;
@@ -20,10 +21,40 @@ const JPEG_QUALITY = 0.8;
 
 /**
  * Process and resize an image before upload
+ * Maintains aspect ratio, scales so long side is MAX_DIMENSION
  */
-async function processImage(uri: string): Promise<{ blob: Blob; width: number; height: number }> {
+async function processImage(
+  uri: string,
+  originalWidth?: number,
+  originalHeight?: number
+): Promise<{ blob: Blob; width: number; height: number }> {
   const context = ImageManipulator.manipulate(uri);
-  const resized = context.resize({ width: MAX_DIMENSION, height: MAX_DIMENSION });
+
+  // Get original dimensions if not provided
+  let width = originalWidth;
+  let height = originalHeight;
+  if (!width || !height) {
+    const original = await context.renderAsync();
+    width = original.width;
+    height = original.height;
+  }
+
+  // Calculate resize dimensions maintaining aspect ratio
+  // Scale so long side is MAX_DIMENSION
+  let resizeWidth: number;
+  let resizeHeight: number;
+
+  if (width > height) {
+    // Landscape - width is long side
+    resizeWidth = MAX_DIMENSION;
+    resizeHeight = Math.round((height / width) * MAX_DIMENSION);
+  } else {
+    // Portrait or square - height is long side
+    resizeHeight = MAX_DIMENSION;
+    resizeWidth = Math.round((width / height) * MAX_DIMENSION);
+  }
+
+  const resized = context.resize({ width: resizeWidth, height: resizeHeight });
   const rendered = await resized.renderAsync();
   const result = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: JPEG_QUALITY });
 
@@ -39,24 +70,33 @@ async function processImage(uri: string): Promise<{ blob: Blob; width: number; h
 }
 
 /**
- * Upload multiple photos for a post
+ * Upload multiple photos for a post with crop data
  */
 async function uploadPostMedia(
   userId: string,
   postId: string,
-  imageUris: string[],
+  photos: PhotoItem[],
   onProgress?: (current: number, total: number) => void
 ): Promise<PostMedia[]> {
   const media: PostMedia[] = [];
 
-  for (let i = 0; i < imageUris.length; i++) {
-    onProgress?.(i + 1, imageUris.length);
+  for (let i = 0; i < photos.length; i++) {
+    const photo = photos[i];
+    onProgress?.(i + 1, photos.length);
 
-    const { blob, width, height } = await processImage(imageUris[i]);
+    const { blob, width, height } = await processImage(photo.uri, photo.width, photo.height);
     const storagePath = getPostMediaPath(userId, postId, i);
     const url = await uploadFile(storagePath, blob, { contentType: 'image/jpeg' });
 
-    media.push({ url, storagePath, width, height });
+    media.push({
+      url,
+      storagePath,
+      width,
+      height,
+      scale: photo.scale,
+      x: photo.x,
+      y: photo.y,
+    });
   }
 
   return media;
@@ -67,11 +107,11 @@ async function uploadPostMedia(
  */
 export async function createPost(
   userId: string,
-  imageUris: string[],
+  photos: PhotoItem[],
   textBody: string | null,
   onProgress?: (current: number, total: number) => void
 ): Promise<Post> {
-  if (imageUris.length > MAX_PHOTOS) {
+  if (photos.length > MAX_PHOTOS) {
     throw new Error(`Maximum ${MAX_PHOTOS} photos allowed`);
   }
 
@@ -88,8 +128,8 @@ export async function createPost(
 
   // Upload media with progress tracking (if any photos)
   let media: PostMedia[] = [];
-  if (imageUris.length > 0) {
-    media = await uploadPostMedia(userId, postId, imageUris, onProgress);
+  if (photos.length > 0) {
+    media = await uploadPostMedia(userId, postId, photos, onProgress);
     // Update the post with media URLs
     await updateDocument(COLLECTIONS.POSTS, postId, { media });
   }
@@ -142,6 +182,9 @@ export interface EditMediaItem {
   storagePath?: string;
   width?: number;
   height?: number;
+  scale?: number;
+  x?: number;
+  y?: number;
 }
 
 /**
@@ -183,22 +226,35 @@ export async function editPost(
 
   for (const item of mediaItems) {
     if (!item.isNew && item.storagePath) {
-      // Existing media - keep as-is
+      // Existing media - keep as-is, preserve crop data if provided
+      const existingMedia = post.media.find((m) => m.storagePath === item.storagePath);
       finalMedia.push({
         url: item.uri,
         storagePath: item.storagePath,
-        width: item.width || 0,
-        height: item.height || 0,
+        width: item.width || existingMedia?.width || 0,
+        height: item.height || existingMedia?.height || 0,
+        // Use new crop data if provided, otherwise keep existing
+        scale: item.scale ?? existingMedia?.scale,
+        x: item.x ?? existingMedia?.x,
+        y: item.y ?? existingMedia?.y,
       });
     } else if (item.isNew) {
       // New media - process and upload
       uploadedCount++;
       onProgress?.(uploadedCount, newItems.length);
 
-      const { blob, width, height } = await processImage(item.uri);
+      const { blob, width, height } = await processImage(item.uri, item.width, item.height);
       const storagePath = getPostMediaPath(userId, postId, Date.now() + uploadedCount);
       const url = await uploadFile(storagePath, blob, { contentType: 'image/jpeg' });
-      finalMedia.push({ url, storagePath, width, height });
+      finalMedia.push({
+        url,
+        storagePath,
+        width,
+        height,
+        scale: item.scale,
+        x: item.x,
+        y: item.y,
+      });
     }
   }
 

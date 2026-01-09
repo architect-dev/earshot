@@ -5,6 +5,10 @@ export interface PostMedia {
   storagePath: string;
   width: number;
   height: number;
+  // Crop data (from PhotoEditor)
+  scale?: number; // 0.5-2, default 1
+  x?: number; // 0-1, default 0.5
+  y?: number; // 0-1, default 0.5
 }
 
 export interface Post {

@@ -31,9 +31,7 @@ export default function CreateScreen() {
     setUploadProgress({ current: 0, total: photos.length });
 
     try {
-      // TODO: Pass crop data (scale, x, y) to createPost for server-side cropping
-      const photoUris = photos.map((p) => p.uri);
-      await createPost(user.uid, photoUris, textBody || null, (current, total) => {
+      await createPost(user.uid, photos, textBody || null, (current, total) => {
         setUploadProgress({ current, total });
       });
 

@@ -67,9 +67,9 @@ export default function EditPostScreen() {
           storagePath: m.storagePath,
           width: m.width,
           height: m.height,
-          scale: DEFAULT_SCALE,
-          x: DEFAULT_X,
-          y: DEFAULT_Y,
+          scale: m.scale ?? DEFAULT_SCALE,
+          x: m.x ?? DEFAULT_X,
+          y: m.y ?? DEFAULT_Y,
         }))
       );
     } catch (err) {
@@ -149,6 +149,9 @@ export default function EditPostScreen() {
         storagePath: p.storagePath,
         width: p.width,
         height: p.height,
+        scale: p.scale,
+        x: p.x,
+        y: p.y,
       }));
 
       await editPost(postId, user.uid, textBody, mediaItems, deletedPathsRef.current, (current, total) => {

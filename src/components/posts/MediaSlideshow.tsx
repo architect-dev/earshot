@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text } from '@/components/ui';
-import { getDisplayAspectRatio } from '@/utils/media';
+import { getDisplayAspectRatio, calculateAspectRatio } from '@/utils/media';
 import { type PostMedia } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -38,26 +38,115 @@ export function MediaSlideshow({ media, onMediaPress }: MediaSlideshowProps) {
     }
   };
 
-  const renderItem = ({ item, index }: { item: PostMedia; index: number }) => (
-    <Pressable
-      onPress={() => onMediaPress?.(index)}
-      style={[styles.mediaContainer, { width: SCREEN_WIDTH, height: containerHeight }]}
-    >
-      <Image source={{ uri: item.url }} style={styles.media} resizeMode="cover" />
-    </Pressable>
-  );
+  const renderItem = ({ item, index }: { item: PostMedia; index: number }) => {
+    // Get crop data (defaults if not present)
+    const scale = item.scale ?? 1;
+    const x = item.x ?? 0.5;
+    const y = item.y ?? 0.5;
+
+    // Calculate image aspect ratio
+    const imageAspectRatio = calculateAspectRatio(item.width, item.height);
+
+    // Calculate how the image should be displayed within the container
+    // The container has a fixed aspect ratio (from first image, clamped)
+    // We need to scale and position the image based on crop data
+
+    let imageWidth: number;
+    let imageHeight: number;
+
+    // Calculate base size (image should "cover" the container at scale=1)
+    if (imageAspectRatio > aspectRatio) {
+      // Image is wider than container - match heights
+      imageHeight = containerHeight;
+      imageWidth = imageHeight * imageAspectRatio;
+    } else {
+      // Image is taller than container - match widths
+      imageWidth = SCREEN_WIDTH;
+      imageHeight = imageWidth / imageAspectRatio;
+    }
+
+    // Apply scale
+    const scaledWidth = imageWidth * scale;
+    const scaledHeight = imageHeight * scale;
+
+    // Calculate pan offset from x/y (0-1)
+    // x=0.5 is centered, x=0 is left flush, x=1 is right flush
+    // Similar for y
+    const maxPanX = Math.max(0, (scaledWidth - SCREEN_WIDTH) / 2);
+    const maxPanY = Math.max(0, (scaledHeight - containerHeight) / 2);
+
+    // Convert x/y (0-1) to translate values
+    // x=0.5 -> translate=0, x=0 -> translate=+maxPan, x=1 -> translate=-maxPan
+    const translateX = maxPanX * (1 - 2 * x);
+    const translateY = maxPanY * (1 - 2 * y);
+
+    return (
+      <Pressable
+        onPress={() => onMediaPress?.(index)}
+        style={[styles.mediaContainer, { width: SCREEN_WIDTH, height: containerHeight }]}
+      >
+        <Image
+          source={{ uri: item.url }}
+          style={[
+            styles.media,
+            {
+              width: scaledWidth,
+              height: scaledHeight,
+              transform: [{ translateX }, { translateY }],
+            },
+          ]}
+          resizeMode="cover"
+        />
+      </Pressable>
+    );
+  };
 
   if (media.length === 0) {
     return null;
   }
 
   if (media.length === 1) {
+    const item = media[0];
+    const scale = item.scale ?? 1;
+    const x = item.x ?? 0.5;
+    const y = item.y ?? 0.5;
+    const imageAspectRatio = calculateAspectRatio(item.width, item.height);
+
+    let imageWidth: number;
+    let imageHeight: number;
+
+    if (imageAspectRatio > aspectRatio) {
+      imageHeight = containerHeight;
+      imageWidth = imageHeight * imageAspectRatio;
+    } else {
+      imageWidth = SCREEN_WIDTH;
+      imageHeight = imageWidth / imageAspectRatio;
+    }
+
+    const scaledWidth = imageWidth * scale;
+    const scaledHeight = imageHeight * scale;
+    const maxPanX = Math.max(0, (scaledWidth - SCREEN_WIDTH) / 2);
+    const maxPanY = Math.max(0, (scaledHeight - containerHeight) / 2);
+    const translateX = maxPanX * (1 - 2 * x);
+    const translateY = maxPanY * (1 - 2 * y);
+
     return (
       <Pressable
         onPress={() => onMediaPress?.(0)}
         style={[styles.singleMediaContainer, { width: SCREEN_WIDTH, height: containerHeight }]}
       >
-        <Image source={{ uri: media[0].url }} style={styles.singleMedia} resizeMode="cover" />
+        <Image
+          source={{ uri: item.url }}
+          style={[
+            styles.singleMedia,
+            {
+              width: scaledWidth,
+              height: scaledHeight,
+              transform: [{ translateX }, { translateY }],
+            },
+          ]}
+          resizeMode="cover"
+        />
       </Pressable>
     );
   }
@@ -113,17 +202,19 @@ const styles = StyleSheet.create({
   },
   mediaContainer: {
     overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   media: {
-    width: '100%',
-    height: '100%',
+    position: 'absolute',
   },
   singleMediaContainer: {
     overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   singleMedia: {
-    width: '100%',
-    height: '100%',
+    position: 'absolute',
   },
   indicator: {
     position: 'absolute',
