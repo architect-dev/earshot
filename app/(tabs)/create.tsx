@@ -66,6 +66,7 @@ export default function CreateScreen() {
   return (
     <ScreenContainer>
       <PageHeader
+        icon="))"
         title="Create"
         rightElement={
           (photos.length > 0 || textBody) && !isSubmitting ? (

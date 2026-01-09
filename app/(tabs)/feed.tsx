@@ -220,7 +220,7 @@ export default function FeedScreen() {
 
   return (
     <ScreenContainer padded={false}>
-      <PageHeader title="Feed" style={styles.header} />
+      <PageHeader icon="((" title="Feed" style={styles.header} />
 
       {loading ? (
         <View style={styles.loadingContainer}>

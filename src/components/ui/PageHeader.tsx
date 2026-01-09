@@ -6,11 +6,12 @@ import { useDebug } from '@/contexts/DebugContext';
 
 interface PageHeaderProps {
   title: string;
+  icon?: string; // Text icon to display before title (e.g., "))", "((", ")(")
   rightElement?: ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
-export function PageHeader({ title, rightElement, style }: PageHeaderProps) {
+export function PageHeader({ title, icon = '))', rightElement, style }: PageHeaderProps) {
   const { showDebugMenu } = useDebug();
 
   const handleDoubleTap = useDoubleTap({
@@ -22,7 +23,7 @@ export function PageHeader({ title, rightElement, style }: PageHeaderProps) {
       <View style={[styles.header, style]}>
         <View style={styles.titleContainer}>
           <Text size="lg" weight="bold" color="gold">
-            ))
+            {icon}
           </Text>
           <Text size="lg" weight="semibold">
             {' '}

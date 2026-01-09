@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FontAwesome5, FontAwesome6 } from '@expo/vector-icons';
+import { FontAwesome5 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui';
@@ -15,6 +15,10 @@ function ProfileTabIcon({ focused }: { focused: boolean }) {
       <Avatar source={userProfile?.profilePhotoUrl} name={userProfile?.fullName} size="sm" style={styles.avatar} />
     </View>
   );
+}
+
+function TextTabIcon({ icon, color }: { icon: string; color: string }) {
+  return <Text style={{ fontSize: 18, fontWeight: 'bold', color }}>{icon}</Text>;
 }
 
 export default function TabsLayout() {
@@ -49,14 +53,21 @@ export default function TabsLayout() {
         name="create"
         options={{
           title: 'CREATE',
-          tabBarIcon: ({ color }) => <FontAwesome6 name="plus" size={18} color={color} />,
+          tabBarIcon: ({ color }) => <TextTabIcon icon="))" color={color} />,
         }}
       />
       <Tabs.Screen
         name="feed"
         options={{
           title: 'FEED',
-          tabBarIcon: ({ color }) => <FontAwesome6 name="bars" size={18} color={color} />,
+          tabBarIcon: ({ color }) => <TextTabIcon icon="((" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="messages/index"
+        options={{
+          title: 'MESSAGES',
+          tabBarIcon: ({ color }) => <TextTabIcon icon=")(" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -64,13 +75,6 @@ export default function TabsLayout() {
         options={{
           title: 'FRIENDS',
           tabBarIcon: ({ color }) => <FontAwesome5 name="user" size={16} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="messages/index"
-        options={{
-          title: 'MESSAGES',
-          tabBarIcon: ({ color }) => <FontAwesome6 name="message" size={18} color={color} />,
         }}
       />
     </Tabs>
