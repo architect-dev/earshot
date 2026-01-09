@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Pressable, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import { Feather } from '@expo/vector-icons';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { ScreenContainer, Text, Button, Avatar, TextInput, Modal, PageHeader } from '@/components/ui';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -229,7 +229,7 @@ export default function ProfileScreen() {
       <Pressable onPress={handlePickPhoto} disabled={isLoading} style={styles.avatarSection}>
         <Avatar source={userProfile?.profilePhotoUrl} name={userProfile?.fullName} size="xl" />
         <View style={[styles.editBadge, { backgroundColor: theme.colors.surface }]}>
-          <Feather name="camera" size={16} color={theme.colors.text} />
+          <FontAwesome6 name="camera" size={14} color={theme.colors.text} />
         </View>
       </Pressable>
 
@@ -387,7 +387,7 @@ function ProfileRow({ label, value, onEdit }: { label: string; value: string; on
           {value}
         </Text>
       </View>
-      <Feather name="edit-2" size={16} color={theme.colors.muted} />
+      <FontAwesome6 name="pen" size={14} color={theme.colors.muted} />
     </Pressable>
   );
 }

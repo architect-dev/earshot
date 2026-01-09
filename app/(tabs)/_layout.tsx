@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { FontAwesome5, FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/ui';
@@ -49,28 +49,28 @@ export default function TabsLayout() {
         name="create"
         options={{
           title: 'CREATE',
-          tabBarIcon: ({ color }) => <Feather name="plus" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <FontAwesome6 name="plus" size={18} color={color} />,
         }}
       />
       <Tabs.Screen
         name="feed"
         options={{
           title: 'FEED',
-          tabBarIcon: ({ color }) => <Feather name="align-justify" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <FontAwesome6 name="bars" size={18} color={color} />,
         }}
       />
       <Tabs.Screen
         name="friends"
         options={{
           title: 'FRIENDS',
-          tabBarIcon: ({ color }) => <Feather name="users" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <FontAwesome5 name="user" size={16} color={color} />,
         }}
       />
       <Tabs.Screen
         name="messages/index"
         options={{
           title: 'MESSAGES',
-          tabBarIcon: ({ color }) => <Feather name="message-square" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <FontAwesome6 name="message" size={18} color={color} />,
         }}
       />
     </Tabs>

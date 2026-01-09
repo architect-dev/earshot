@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text } from '@/components/ui';
 
@@ -62,11 +62,11 @@ function DebugRow({ item, onFolderPress }: DebugRowProps) {
         {item.label}
       </Text>
       {item.type === 'folder' ? (
-        <Feather name="chevron-right" size={18} color={theme.colors.muted} />
+        <FontAwesome6 name="chevron-right" size={14} color={theme.colors.muted} />
       ) : loading ? (
-        <Feather name="loader" size={14} color={theme.colors.muted} />
+        <FontAwesome6 name="spinner" size={12} color={theme.colors.muted} />
       ) : (
-        <Feather name="play" size={14} color={theme.colors.pine} />
+        <FontAwesome6 name="play" size={12} color={theme.colors.pine} />
       )}
     </Pressable>
   );
@@ -109,7 +109,7 @@ export function DebugMenu({ visible, onClose, items }: DebugMenuProps) {
         <View style={styles.headerLeft}>
           {navigationStack.length > 0 ? (
             <Pressable onPress={handleBack} style={styles.iconButton}>
-              <Feather name="chevron-left" size={24} color={theme.colors.text} />
+              <FontAwesome6 name="chevron-left" size={20} color={theme.colors.text} />
             </Pressable>
           ) : (
             <View style={styles.iconButton} />
@@ -122,7 +122,7 @@ export function DebugMenu({ visible, onClose, items }: DebugMenuProps) {
         </View>
         <View style={styles.headerRight}>
           <Pressable onPress={handleClose} style={styles.iconButton}>
-            <Feather name="x" size={24} color={theme.colors.text} />
+            <FontAwesome6 name="xmark" size={20} color={theme.colors.text} />
           </Pressable>
         </View>
       </View>

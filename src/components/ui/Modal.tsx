@@ -8,7 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text } from './Text';
 
@@ -77,7 +77,7 @@ export function Modal({
                 </View>
                 {showCloseButton && (
                   <Pressable onPress={onClose} style={styles.closeButton} hitSlop={8}>
-                    <Feather name="x" size={20} color={theme.colors.muted} />
+                    <FontAwesome6 name="xmark" size={18} color={theme.colors.muted} />
                   </Pressable>
                 )}
               </View>
