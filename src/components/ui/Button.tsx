@@ -4,10 +4,12 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Text } from './Text';
 
 type ButtonVariant = 'primary' | 'secondary' | 'success' | 'error' | 'ghost';
+type ButtonSize = 'default' | 'small';
 
 interface ButtonProps extends Omit<PressableProps, 'children'> {
   title: string;
   variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
   fullWidth?: boolean;
 }
@@ -15,6 +17,7 @@ interface ButtonProps extends Omit<PressableProps, 'children'> {
 export function Button({
   title,
   variant = 'primary',
+  size = 'default',
   loading = false,
   fullWidth = false,
   disabled,
@@ -73,12 +76,38 @@ export function Button({
     }
   };
 
+  const getSizeStyles = (): { container: ViewStyle; textSize: 'xs' | 'sm' } => {
+    switch (size) {
+      case 'small':
+        return {
+          container: {
+            paddingVertical: 4,
+            paddingHorizontal: 8,
+            minHeight: 28,
+          },
+          textSize: 'xs',
+        };
+      case 'default':
+      default:
+        return {
+          container: {
+            paddingVertical: 8,
+            paddingHorizontal: 14,
+            minHeight: 36,
+          },
+          textSize: 'sm',
+        };
+    }
+  };
+
   const variantStyles = getVariantStyles();
+  const sizeStyles = getSizeStyles();
 
   return (
     <Pressable
       style={({ pressed }) => [
         styles.container,
+        sizeStyles.container,
         variantStyles.container,
         fullWidth && styles.fullWidth,
         pressed && styles.pressed,
@@ -90,7 +119,7 @@ export function Button({
       {loading ? (
         <ActivityIndicator size="small" color={theme.colors[variantStyles.textColor]} />
       ) : (
-        <Text size="sm" weight="semibold" color={variantStyles.textColor} style={styles.text}>
+        <Text size={sizeStyles.textSize} weight="semibold" color={variantStyles.textColor} style={styles.text}>
           [{title.toUpperCase()}]
         </Text>
       )}
@@ -100,13 +129,10 @@ export function Button({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
     borderWidth: 1,
     borderRadius: 0, // Sharp corners
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 36,
   },
   fullWidth: {
     width: '100%',

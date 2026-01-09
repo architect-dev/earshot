@@ -1,21 +1,13 @@
 import { View, StyleSheet } from 'react-native';
-import { ScreenContainer, Text } from '@/components/ui';
+import { ScreenContainer, Text, PageHeader } from '@/components/ui';
 
 export default function MessagesScreen() {
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Text size="lg" weight="bold" color="gold">
-          ))
-        </Text>
-        <Text size="lg" weight="semibold">
-          {' '}
-          Messages
-        </Text>
-      </View>
+      <PageHeader title="Messages" />
       <View style={styles.content}>
         <Text color="subtle" align="center">
-          Lorem ipsum dolor sit amet
+          Your conversations will appear here
         </Text>
       </View>
     </ScreenContainer>
@@ -23,11 +15,6 @@ export default function MessagesScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
   content: {
     flex: 1,
     justifyContent: 'center',

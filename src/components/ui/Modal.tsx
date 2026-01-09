@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text } from './Text';
 
@@ -20,6 +21,8 @@ interface ModalProps {
   footer?: ReactNode;
   // Close on backdrop press (default: true)
   dismissable?: boolean;
+  // Show close button in header (default: true)
+  showCloseButton?: boolean;
   // Animation type
   animationType?: 'none' | 'slide' | 'fade';
   // Custom styles
@@ -34,6 +37,7 @@ export function Modal({
   children,
   footer,
   dismissable = true,
+  showCloseButton = true,
   animationType = 'fade',
   containerStyle,
   contentStyle,
@@ -62,11 +66,20 @@ export function Modal({
             // Prevent backdrop press from triggering when pressing modal content
             onPress={(e) => e.stopPropagation()}
           >
-            {title && (
+            {(title || showCloseButton) && (
               <View style={styles.header}>
-                <Text size="lg" weight="semibold">
-                  {title}
-                </Text>
+                <View style={styles.headerTitle}>
+                  {title && (
+                    <Text size="lg" weight="semibold">
+                      {title}
+                    </Text>
+                  )}
+                </View>
+                {showCloseButton && (
+                  <Pressable onPress={onClose} style={styles.closeButton} hitSlop={8}>
+                    <Feather name="x" size={20} color={theme.colors.muted} />
+                  </Pressable>
+                )}
               </View>
             )}
 
@@ -98,8 +111,16 @@ const styles = StyleSheet.create({
     // No shadow - completely flat design
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  headerTitle: {
+    flex: 1,
+  },
+  closeButton: {
+    padding: 4,
   },
   content: {
     padding: 16,

@@ -1,20 +1,61 @@
 import { Alert } from 'react-native';
 import { type DebugMenuItem } from './DebugMenu';
+import { SEED_USERS, createSeedUsers, switchToSeedUser } from '@/services/debug';
 
 // Helper to show an alert
 const showAlert = (title: string, message?: string) => {
   Alert.alert(title, message);
 };
 
-// Track confirm modal state - will be set by the component using this
-let openConfirmModal: (() => void) | null = null;
-
-export const setConfirmModalOpener = (opener: () => void) => {
-  openConfirmModal = opener;
-};
+interface GetDebugItemsOptions {
+  openConfirmModal?: (() => void) | null;
+}
 
 // Default debug items
-export const getDefaultDebugItems = (): DebugMenuItem[] => [
+export const getDefaultDebugItems = (options?: GetDebugItemsOptions): DebugMenuItem[] => [
+  {
+    type: 'folder',
+    label: 'Switch User',
+    items: [
+      {
+        type: 'action',
+        label: 'Create All Seed Users',
+        onPress: async () => {
+          try {
+            const result = await createSeedUsers();
+            const message = [
+              result.created.length > 0 ? `Created: ${result.created.join(', ')}` : null,
+              result.skipped.length > 0 ? `Skipped: ${result.skipped.join(', ')}` : null,
+              result.errors.length > 0 ? `Errors: ${result.errors.join(', ')}` : null,
+            ]
+              .filter(Boolean)
+              .join('\n\n');
+            showAlert('Seed Users', message || 'No changes made');
+          } catch (err) {
+            showAlert('Error', String(err));
+          }
+        },
+      },
+      // Generate switch actions for each seed user
+      ...SEED_USERS.map((user) => ({
+        type: 'action' as const,
+        label: `→ ${user.fullName} (@${user.username})`,
+        onPress: async () => {
+          try {
+            await switchToSeedUser(user.email);
+            showAlert('Switched', `Now signed in as ${user.fullName}`);
+          } catch (err) {
+            const error = err as { code?: string };
+            if (error.code === 'auth/user-not-found') {
+              showAlert('User Not Found', 'Run "Create All Seed Users" first');
+            } else {
+              showAlert('Error', String(err));
+            }
+          }
+        },
+      })),
+    ],
+  },
   {
     type: 'folder',
     label: 'Authentication',
@@ -135,8 +176,8 @@ export const getDefaultDebugItems = (): DebugMenuItem[] => [
         type: 'action',
         label: 'Open Confirm Modal',
         onPress: () => {
-          if (openConfirmModal) {
-            openConfirmModal();
+          if (options?.openConfirmModal) {
+            options.openConfirmModal();
           } else {
             showAlert('Confirm Modal', 'Modal opener not set');
           }

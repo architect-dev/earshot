@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer, Text, Button } from '@/components/ui';
@@ -6,28 +6,52 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function VerifyEmailScreen() {
   const router = useRouter();
-  const { user, isEmailVerified, sendVerificationEmail, logout } = useAuth();
+  const { user, isEmailVerified, sendVerificationEmail, logout, refreshAuth } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Check verification status periodically
+  // Manual check for verification status - uses refreshAuth to update context state
+  const checkVerification = useCallback(async () => {
+    try {
+      const verified = await refreshAuth();
+      // The root layout will handle navigation when isEmailVerified updates in context
+      return verified;
+    } catch {
+      // Ignore errors during check
+    }
+    return false;
+  }, [refreshAuth]);
+
+  // Check on mount and when isEmailVerified changes
   useEffect(() => {
     if (isEmailVerified) {
       router.replace('/(tabs)/feed');
-      return;
     }
+  }, [isEmailVerified, router]);
 
-    // Poll for verification status every 3 seconds
-    const interval = setInterval(async () => {
-      await user?.reload();
-      if (user?.emailVerified) {
-        router.replace('/(tabs)/feed');
-      }
-    }, 3000);
+  // Poll for verification status every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkVerification();
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, [isEmailVerified, user, router]);
+  }, [checkVerification]);
+
+  const handleCheckStatus = async () => {
+    setChecking(true);
+    setError(null);
+    setMessage(null);
+
+    const verified = await checkVerification();
+    if (!verified) {
+      setMessage('Email not yet verified. Please check your inbox.');
+    }
+
+    setChecking(false);
+  };
 
   const handleResend = async () => {
     setError(null);
@@ -80,7 +104,21 @@ export default function VerifyEmailScreen() {
           )}
 
           <View style={styles.buttons}>
-            <Button title="RESEND EMAIL" variant="primary" onPress={handleResend} loading={loading} fullWidth />
+            <Button
+              title="I'VE VERIFIED MY EMAIL"
+              variant="primary"
+              onPress={handleCheckStatus}
+              loading={checking}
+              fullWidth
+            />
+            <Button
+              title="RESEND EMAIL"
+              variant="secondary"
+              onPress={handleResend}
+              loading={loading}
+              fullWidth
+              style={styles.resendButton}
+            />
             <Button title="SIGN OUT" variant="ghost" onPress={handleLogout} style={styles.logoutButton} />
           </View>
         </View>
@@ -117,6 +155,9 @@ const styles = StyleSheet.create({
   buttons: {
     width: '100%',
     marginTop: 16,
+  },
+  resendButton: {
+    marginTop: 12,
   },
   logoutButton: {
     marginTop: 16,

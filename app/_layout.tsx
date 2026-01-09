@@ -1,11 +1,49 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { LoadingSpinner } from '@/components/ui';
+import { DebugProvider, useDebug } from '@/contexts/DebugContext';
+import { LoadingSpinner, ConfirmModal } from '@/components/ui';
+import { DebugMenu, getDefaultDebugItems } from '@/components/debug';
+
+function GlobalDebugMenu() {
+  const { isDebugMenuVisible, hideDebugMenu, confirmModalOpener, setConfirmModalOpener } = useDebug();
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+
+  // Wire up the confirm modal opener
+  useEffect(() => {
+    if (__DEV__) {
+      setConfirmModalOpener(() => setConfirmModalVisible(true));
+    }
+    return () => {
+      setConfirmModalOpener(null);
+    };
+  }, [setConfirmModalOpener]);
+
+  if (!__DEV__) return null;
+
+  return (
+    <>
+      <DebugMenu
+        visible={isDebugMenuVisible}
+        onClose={hideDebugMenu}
+        items={getDefaultDebugItems({ openConfirmModal: confirmModalOpener })}
+      />
+      <ConfirmModal
+        visible={confirmModalVisible}
+        onClose={() => setConfirmModalVisible(false)}
+        onConfirm={() => setConfirmModalVisible(false)}
+        title="Confirm Action"
+        message="This is a test of the confirm modal component."
+        confirmText="CONFIRM"
+        cancelText="CANCEL"
+      />
+    </>
+  );
+}
 
 function RootLayoutNav() {
   const { theme, themeMode } = useTheme();
@@ -45,6 +83,7 @@ function RootLayoutNav() {
           animation: 'fade',
         }}
       />
+      <GlobalDebugMenu />
     </>
   );
 }
@@ -54,7 +93,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.container}>
       <ThemeProvider>
         <AuthProvider>
-          <RootLayoutNav />
+          <DebugProvider>
+            <RootLayoutNav />
+          </DebugProvider>
         </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

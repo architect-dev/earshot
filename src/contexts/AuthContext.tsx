@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import { onAuthStateChanged, type User as FirebaseUser, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import {
+  onAuthStateChanged,
+  type User as FirebaseUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from 'firebase/auth';
 import {
   auth,
   signIn,
@@ -39,6 +44,7 @@ interface AuthContextValue {
   sendPasswordReset: (email: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   refreshUserProfile: () => Promise<void>;
+  refreshAuth: () => Promise<boolean>; // Returns true if email is now verified
 
   // Profile Actions
   updateProfile: (data: UpdateUserData) => Promise<void>;
@@ -94,13 +100,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [fetchUserProfile]);
 
   // Re-authenticate user (required for sensitive operations)
-  const reauthenticate = useCallback(async (currentPassword: string) => {
-    if (!user || !user.email) {
-      throw new Error('No authenticated user');
-    }
-    const credential = EmailAuthProvider.credential(user.email, currentPassword);
-    await reauthenticateWithCredential(user, credential);
-  }, [user]);
+  const reauthenticate = useCallback(
+    async (currentPassword: string) => {
+      if (!user || !user.email) {
+        throw new Error('No authenticated user');
+      }
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+    },
+    [user]
+  );
 
   // Login with email and password
   const login = useCallback(async (email: string, password: string) => {
@@ -166,6 +175,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await fetchUserProfile(user.uid);
     }
   }, [user, fetchUserProfile]);
+
+  // Refresh auth state (reloads Firebase user and triggers state update)
+  const refreshAuth = useCallback(async (): Promise<boolean> => {
+    if (!user) return false;
+
+    await user.reload();
+    // Force state update by getting fresh user from auth
+    const freshUser = auth.currentUser;
+    if (freshUser) {
+      setUser(freshUser);
+      return freshUser.emailVerified;
+    }
+    return false;
+  }, [user]);
 
   // Update profile (fullName)
   const updateProfile = useCallback(
@@ -311,6 +334,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       sendPasswordReset,
       sendVerificationEmail,
       refreshUserProfile,
+      refreshAuth,
       updateProfile,
       updateProfilePhoto,
       updateEmail,
@@ -331,6 +355,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       sendPasswordReset,
       sendVerificationEmail,
       refreshUserProfile,
+      refreshAuth,
       updateProfile,
       updateProfilePhoto,
       updateEmail,

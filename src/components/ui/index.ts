@@ -6,3 +6,5 @@ export { LoadingSpinner } from './LoadingSpinner';
 export { ScreenContainer } from './ScreenContainer';
 export { Modal } from './Modal';
 export { ConfirmModal } from './ConfirmModal';
+export { PageHeader } from './PageHeader';
+export { Spacer } from './Spacer';

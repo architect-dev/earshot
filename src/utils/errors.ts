@@ -46,3 +46,37 @@ export function getFirebaseErrorCode(error: unknown): string {
   }
   return 'unknown';
 }
+
+/**
+ * Get a user-friendly error message from any error type.
+ * - For Firebase errors (with code), uses the auth error mapping
+ * - For regular Error objects, returns the error message
+ * - For unknown types, returns a default message
+ */
+export function getErrorMessage(error: unknown, fallback = 'An error occurred. Please try again'): string {
+  // Check for Firebase error with code
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code: string }).code;
+    // If it's an auth error, use the auth error mapping
+    if (code.startsWith('auth/')) {
+      return getAuthErrorMessage(code);
+    }
+    // For other Firebase errors, check for a message
+    if ('message' in error && typeof (error as { message: unknown }).message === 'string') {
+      return (error as { message: string }).message;
+    }
+    return fallback;
+  }
+
+  // Check for standard Error object
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  // Check for string
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return fallback;
+}

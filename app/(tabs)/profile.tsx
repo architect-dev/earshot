@@ -3,7 +3,7 @@ import { View, Pressable, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
-import { ScreenContainer, Text, Button, Avatar, TextInput, Modal } from '@/components/ui';
+import { ScreenContainer, Text, Button, Avatar, TextInput, Modal, PageHeader } from '@/components/ui';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAuthErrorMessage, getFirebaseErrorCode } from '@/utils/errors';
@@ -223,16 +223,7 @@ export default function ProfileScreen() {
 
   return (
     <ScreenContainer scrollable>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text size="lg" weight="bold" color="gold">
-          ))
-        </Text>
-        <Text size="lg" weight="semibold">
-          {' '}
-          Profile
-        </Text>
-      </View>
+      <PageHeader title="Profile" />
 
       {/* Avatar */}
       <Pressable onPress={handlePickPhoto} disabled={isLoading} style={styles.avatarSection}>
@@ -402,11 +393,6 @@ function ProfileRow({ label, value, onEdit }: { label: string; value: string; on
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
   avatarSection: {
     alignSelf: 'center',
     marginVertical: 24,
