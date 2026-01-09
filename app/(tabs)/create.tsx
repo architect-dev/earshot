@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { ScreenContainer, Text, Button, TextInput, PageHeader, UploadProgress } from '@/components/ui';
-import { PhotoGrid } from '@/components/posts';
+import { PhotoEditor, type PhotoItem } from '@/components/posts';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePhotoPicker } from '@/hooks';
@@ -12,10 +12,14 @@ export default function CreateScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
 
-  const { photos, pickPhotos, removePhoto, movePhoto, clearPhotos } = usePhotoPicker();
+  const { photos, setPhotos, pickPhotos, clearPhotos } = usePhotoPicker();
   const [textBody, setTextBody] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const handlePhotosChange = (newPhotos: PhotoItem[]) => {
+    setPhotos(newPhotos);
+  };
 
   const handleSubmit = async () => {
     if (!user) {
@@ -27,6 +31,7 @@ export default function CreateScreen() {
     setUploadProgress({ current: 0, total: photos.length });
 
     try {
+      // TODO: Pass crop data (scale, x, y) to createPost for server-side cropping
       const photoUris = photos.map((p) => p.uri);
       await createPost(user.uid, photoUris, textBody || null, (current, total) => {
         setUploadProgress({ current, total });
@@ -72,13 +77,7 @@ export default function CreateScreen() {
       />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <PhotoGrid
-          photos={photos}
-          onAdd={pickPhotos}
-          onRemove={removePhoto}
-          onMove={movePhoto}
-          disabled={isSubmitting}
-        />
+        <PhotoEditor photos={photos} onPhotosChange={handlePhotosChange} onAdd={pickPhotos} disabled={isSubmitting} />
 
         {/* Caption */}
         <View style={styles.section}>
@@ -92,7 +91,7 @@ export default function CreateScreen() {
             value={textBody}
             onChangeText={setTextBody}
             multiline
-            numberOfLines={6}
+            numberOfLines={4}
             style={styles.textInput}
           />
         </View>
@@ -129,7 +128,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   textInput: {
-    minHeight: 150,
+    minHeight: 100,
     textAlignVertical: 'top',
   },
   footer: {

@@ -1,20 +1,27 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer, Text, Button, TextInput, PageHeader, LoadingSpinner, UploadProgress } from '@/components/ui';
-import { PhotoGrid, MAX_PHOTOS, type PhotoItem } from '@/components/posts';
+import {
+  PhotoEditor,
+  MAX_PHOTOS,
+  type PhotoItem,
+  createPhotoItem,
+  DEFAULT_SCALE,
+  DEFAULT_X,
+  DEFAULT_Y,
+} from '@/components/posts';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getPost, editPost, type EditMediaItem } from '@/services/posts';
 import { getErrorMessage } from '@/utils/errors';
 import { type Post } from '@/types';
 
+// Extended PhotoItem for edit screen with storage path
 interface EditPhotoItem extends PhotoItem {
   storagePath?: string;
-  width?: number;
-  height?: number;
 }
 
 export default function EditPostScreen() {
@@ -29,8 +36,10 @@ export default function EditPostScreen() {
   const [post, setPost] = useState<Post | null>(null);
   const [photos, setPhotos] = useState<EditPhotoItem[]>([]);
   const [textBody, setTextBody] = useState('');
-  const [deletedPaths, setDeletedPaths] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+
+  // Track deleted storage paths
+  const deletedPathsRef = useRef<string[]>([]);
 
   const loadPost = useCallback(async () => {
     if (!postId) return;
@@ -58,6 +67,9 @@ export default function EditPostScreen() {
           storagePath: m.storagePath,
           width: m.width,
           height: m.height,
+          scale: DEFAULT_SCALE,
+          x: DEFAULT_X,
+          y: DEFAULT_Y,
         }))
       );
     } catch (err) {
@@ -94,31 +106,29 @@ export default function EditPostScreen() {
 
     if (!result.canceled && result.assets.length > 0) {
       const newPhotos: EditPhotoItem[] = result.assets.map((asset) => ({
-        uri: asset.uri,
-        isNew: true,
+        ...createPhotoItem(asset.uri, asset.width, asset.height, true),
       }));
       setPhotos((prev) => [...prev, ...newPhotos].slice(0, MAX_PHOTOS));
     }
   }, [photos.length]);
 
-  const handleRemovePhoto = useCallback((index: number) => {
-    setPhotos((prev) => {
-      const item = prev[index];
-      if (!item.isNew && item.storagePath) {
-        setDeletedPaths((paths) => [...paths, item.storagePath!]);
+  const handlePhotosChange = useCallback((newPhotos: PhotoItem[]) => {
+    // Find removed photos with storage paths and track them for deletion
+    setPhotos((prevPhotos) => {
+      const newUris = new Set(newPhotos.map((p) => p.uri));
+      for (const prev of prevPhotos) {
+        if (!newUris.has(prev.uri) && !prev.isNew && prev.storagePath) {
+          deletedPathsRef.current.push(prev.storagePath);
+        }
       }
-      return prev.filter((_, i) => i !== index);
-    });
-  }, []);
-
-  const handleMovePhoto = useCallback((fromIndex: number, direction: 'left' | 'right') => {
-    setPhotos((prev) => {
-      const toIndex = direction === 'left' ? fromIndex - 1 : fromIndex + 1;
-      if (toIndex < 0 || toIndex >= prev.length) return prev;
-
-      const newPhotos = [...prev];
-      [newPhotos[fromIndex], newPhotos[toIndex]] = [newPhotos[toIndex], newPhotos[fromIndex]];
-      return newPhotos;
+      // Cast back to EditPhotoItem, preserving storagePath for existing items
+      return newPhotos.map((p) => {
+        const existing = prevPhotos.find((prev) => prev.uri === p.uri);
+        return {
+          ...p,
+          storagePath: existing?.storagePath,
+        } as EditPhotoItem;
+      });
     });
   }, []);
 
@@ -141,7 +151,7 @@ export default function EditPostScreen() {
         height: p.height,
       }));
 
-      await editPost(postId, user.uid, textBody, mediaItems, deletedPaths, (current, total) => {
+      await editPost(postId, user.uid, textBody, mediaItems, deletedPathsRef.current, (current, total) => {
         setUploadProgress({ current, total });
       });
 
@@ -158,7 +168,7 @@ export default function EditPostScreen() {
     const hasChanges =
       textBody !== (post?.textBody || '') ||
       photos.length !== post?.media.length ||
-      deletedPaths.length > 0 ||
+      deletedPathsRef.current.length > 0 ||
       photos.some((p) => p.isNew);
 
     if (hasChanges) {
@@ -184,13 +194,7 @@ export default function EditPostScreen() {
       <PageHeader title="Edit Post" />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <PhotoGrid
-          photos={photos}
-          onAdd={handlePickPhotos}
-          onRemove={handleRemovePhoto}
-          onMove={handleMovePhoto}
-          disabled={saving}
-        />
+        <PhotoEditor photos={photos} onPhotosChange={handlePhotosChange} onAdd={handlePickPhotos} disabled={saving} />
 
         {/* Caption */}
         <View style={styles.section}>
@@ -204,7 +208,7 @@ export default function EditPostScreen() {
             value={textBody}
             onChangeText={setTextBody}
             multiline
-            numberOfLines={6}
+            numberOfLines={4}
             style={styles.textInput}
           />
         </View>

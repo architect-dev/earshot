@@ -40,7 +40,10 @@ export function PhotoGrid({
 
       <View style={styles.grid}>
         {photos.map((photo, index) => (
-          <View key={`${photo.uri}-${index}`} style={[styles.photoContainer, { borderColor: theme.colors.highlightMed }]}>
+          <View
+            key={`${photo.uri}-${index}`}
+            style={[styles.photoContainer, { borderColor: theme.colors.highlightMed }]}
+          >
             <Image source={{ uri: photo.uri }} style={styles.photo} />
 
             {photo.isNew && (
@@ -90,7 +93,10 @@ export function PhotoGrid({
 
         {photos.length < maxPhotos && (
           <Pressable
-            style={[styles.addButton, { borderColor: theme.colors.highlightMed, backgroundColor: theme.colors.surface }]}
+            style={[
+              styles.addButton,
+              { borderColor: theme.colors.highlightMed, backgroundColor: theme.colors.surface },
+            ]}
             onPress={onAdd}
             disabled={disabled}
           >
@@ -169,4 +175,3 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
-

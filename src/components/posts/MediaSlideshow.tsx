@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Image,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text } from '@/components/ui';
+import { getDisplayAspectRatio } from '@/utils/media';
 import { type PostMedia } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -25,6 +26,10 @@ export function MediaSlideshow({ media, onMediaPress }: MediaSlideshowProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
+  // Calculate aspect ratio from first image, clamped to allowed range (4:5 to 1.91:1)
+  const aspectRatio = useMemo(() => getDisplayAspectRatio(media), [media]);
+  const containerHeight = SCREEN_WIDTH / aspectRatio;
+
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / SCREEN_WIDTH);
@@ -34,7 +39,10 @@ export function MediaSlideshow({ media, onMediaPress }: MediaSlideshowProps) {
   };
 
   const renderItem = ({ item, index }: { item: PostMedia; index: number }) => (
-    <Pressable onPress={() => onMediaPress?.(index)} style={styles.mediaContainer}>
+    <Pressable
+      onPress={() => onMediaPress?.(index)}
+      style={[styles.mediaContainer, { width: SCREEN_WIDTH, height: containerHeight }]}
+    >
       <Image source={{ uri: item.url }} style={styles.media} resizeMode="cover" />
     </Pressable>
   );
@@ -45,14 +53,17 @@ export function MediaSlideshow({ media, onMediaPress }: MediaSlideshowProps) {
 
   if (media.length === 1) {
     return (
-      <Pressable onPress={() => onMediaPress?.(0)} style={styles.singleMediaContainer}>
+      <Pressable
+        onPress={() => onMediaPress?.(0)}
+        style={[styles.singleMediaContainer, { width: SCREEN_WIDTH, height: containerHeight }]}
+      >
         <Image source={{ uri: media[0].url }} style={styles.singleMedia} resizeMode="cover" />
       </Pressable>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: containerHeight }]}>
       <FlatList
         ref={flatListRef}
         data={media}
@@ -98,18 +109,17 @@ export function MediaSlideshow({ media, onMediaPress }: MediaSlideshowProps) {
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
+    width: SCREEN_WIDTH,
   },
   mediaContainer: {
-    width: SCREEN_WIDTH,
-    aspectRatio: 1,
+    overflow: 'hidden',
   },
   media: {
     width: '100%',
     height: '100%',
   },
   singleMediaContainer: {
-    width: '100%',
-    aspectRatio: 1,
+    overflow: 'hidden',
   },
   singleMedia: {
     width: '100%',
@@ -136,4 +146,3 @@ const styles = StyleSheet.create({
     height: 6,
   },
 });
-
