@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Image,
@@ -11,23 +11,28 @@ import {
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text } from '@/components/ui';
-import { getDisplayAspectRatio, calculateAspectRatio } from '@/utils/media';
+import { calculateAspectRatio, clampAspectRatio } from '@/utils/media';
 import { type PostMedia } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface MediaSlideshowProps {
   media: PostMedia[];
+  mediaAspectRatio?: number; // Clamped aspect ratio from post (optional for backwards compatibility)
   onMediaPress?: (index: number) => void;
 }
 
-export function MediaSlideshow({ media, onMediaPress }: MediaSlideshowProps) {
+export function MediaSlideshow({ media, mediaAspectRatio, onMediaPress }: MediaSlideshowProps) {
   const { theme } = useTheme();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
-  // Calculate aspect ratio from first image, clamped to allowed range (4:5 to 1.91:1)
-  const aspectRatio = useMemo(() => getDisplayAspectRatio(media), [media]);
+  // Use the stored aspect ratio from the post, or calculate from first media as fallback
+  const aspectRatio =
+    mediaAspectRatio ??
+    (media.length > 0 && media[0].width && media[0].height
+      ? clampAspectRatio(calculateAspectRatio(media[0].width, media[0].height))
+      : 1);
   const containerHeight = SCREEN_WIDTH / aspectRatio;
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -48,7 +53,7 @@ export function MediaSlideshow({ media, onMediaPress }: MediaSlideshowProps) {
     const imageAspectRatio = calculateAspectRatio(item.width, item.height);
 
     // Calculate how the image should be displayed within the container
-    // The container has a fixed aspect ratio (from first image, clamped)
+    // The container has a fixed aspect ratio (stored in post)
     // We need to scale and position the image based on crop data
 
     let imageWidth: number;

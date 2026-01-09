@@ -16,6 +16,7 @@ export interface Post {
   authorId: string;
   textBody: string | null;
   media: PostMedia[];
+  mediaAspectRatio?: number; // Clamped aspect ratio of first media (4:5 to 1.91:1), optional for backwards compatibility
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

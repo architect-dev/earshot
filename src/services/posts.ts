@@ -14,6 +14,7 @@ import {
 import { uploadFile, deleteFile, getPostMediaPath } from './firebase/storage';
 import { type Post, type PostMedia, type PostWithAuthor, type User } from '@/types';
 import { type PhotoItem } from '@/components/posts';
+import { calculateAspectRatio, clampAspectRatio } from '@/utils/media';
 
 const MAX_PHOTOS = 6;
 const MAX_DIMENSION = 1440;
@@ -115,11 +116,19 @@ export async function createPost(
     throw new Error(`Maximum ${MAX_PHOTOS} photos allowed`);
   }
 
+  // Calculate media aspect ratio from first photo (clamped)
+  let mediaAspectRatio = 1; // Default to square if no photos
+  if (photos.length > 0 && photos[0].width && photos[0].height) {
+    const ratio = calculateAspectRatio(photos[0].width, photos[0].height);
+    mediaAspectRatio = clampAspectRatio(ratio);
+  }
+
   // Create the post document first to get the ID
   const postData = {
     authorId: userId,
     textBody: textBody?.trim() || null,
     media: [] as PostMedia[],
+    mediaAspectRatio,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -258,10 +267,18 @@ export async function editPost(
     }
   }
 
+  // Calculate media aspect ratio from first media (clamped)
+  let mediaAspectRatio = 1; // Default to square if no media
+  if (finalMedia.length > 0 && finalMedia[0].width && finalMedia[0].height) {
+    const ratio = calculateAspectRatio(finalMedia[0].width, finalMedia[0].height);
+    mediaAspectRatio = clampAspectRatio(ratio);
+  }
+
   // Update the post document
   await updateDocument(COLLECTIONS.POSTS, postId, {
     textBody: textBody?.trim() || null,
     media: finalMedia,
+    mediaAspectRatio,
     updatedAt: serverTimestamp(),
   });
 }

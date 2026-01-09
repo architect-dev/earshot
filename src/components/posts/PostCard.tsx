@@ -52,7 +52,9 @@ export function PostCard({
       </View>
 
       {/* Media */}
-      {post.media.length > 0 && <MediaSlideshow media={post.media} onMediaPress={onMediaPress} />}
+      {post.media.length > 0 && (
+        <MediaSlideshow media={post.media} mediaAspectRatio={post.mediaAspectRatio} onMediaPress={onMediaPress} />
+      )}
 
       {/* Text Body */}
       {post.textBody && (

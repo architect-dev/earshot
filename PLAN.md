@@ -119,9 +119,16 @@
 
 - [x] Create Posts collection
 - [x] Implement photo upload (multiple)
+- [x] Image processing:
+  - [x] Maintain aspect ratio (scale long side to 1440px)
+  - [x] Store crop data (scale, x, y) with media
 - [x] Build Create tab:
   - [x] Photo picker (up to 6)
-  - [x] Photo preview/reorder
+  - [x] PhotoEditor system:
+    - [x] PhotoStrip (horizontal list with drag-to-reorder)
+    - [x] PhotoCropEditor (pinch-to-zoom, pan gestures)
+    - [x] Crop indicator with 36px padding on long side
+    - [x] Independent crop settings per image
   - [x] Text body input
   - [x] Post submission
   - [x] Upload progress indicator
@@ -139,23 +146,29 @@
   - [x] Heart button (hidden for own posts)
   - [x] Comment button (hidden for own posts)
   - [x] Timestamp display (relative < 1 week, absolute >= 1 week)
-- [x] Build InteractionModal component:
+- [x] Build PostInteractionModal component:
   - [x] Quoted content preview (matches DM appearance)
   - [x] Heart mode (preview + send)
   - [x] Comment mode (text input + send)
   - [x] [CANCEL] and [SEND] buttons
+- [x] Build MediaSlideshow component:
+  - [x] Uses clamped aspect ratio of first media
+  - [x] Applies crop data (scale, x, y) to position images
+  - [x] Swipeable slides
+  - [x] Position indicator and dot navigation
 - [ ] Build MediaViewer (full screen):
   - [ ] Swipeable slides
   - [ ] Pinch-to-zoom
   - [ ] Per-media heart/comment (triggers InteractionModal)
   - [ ] Close gesture/button
-- [x] Implement post editing (text + media)
+- [x] Implement post editing (text + media):
   - [x] Edit text body
   - [x] Add/remove/reorder photos
+  - [x] Edit crop settings for existing photos
   - [x] Upload progress indicator
 - [x] Implement post deletion
 - [x] Reusable components extracted:
-  - [x] PhotoGrid component
+  - [x] PhotoEditor system (PhotoStrip, PhotoCropEditor)
   - [x] UploadProgress component
   - [x] usePhotoPicker hook
 
@@ -384,8 +397,13 @@ earshot/
 ### Image Handling
 
 - **expo-image-picker** for selection
+- **expo-image-manipulator** for processing
 - **expo-image** for optimized display
 - Compress before upload (quality: 0.8, max dimension: 1440px on longest axis)
+- Maintain aspect ratio (scale long side to 1440px)
+- Store crop data (scale, x, y) with each media item
+- **react-native-draggable-flatlist** for photo reordering
+- **react-native-gesture-handler** and **react-native-reanimated** for crop gestures
 
 ### Forms
 
