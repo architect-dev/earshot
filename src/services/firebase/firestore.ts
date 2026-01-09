@@ -16,6 +16,7 @@ import {
   type DocumentData,
   type QueryConstraint,
   type DocumentReference,
+  type DocumentSnapshot,
   type Unsubscribe,
   Timestamp,
 } from 'firebase/firestore';
@@ -93,6 +94,48 @@ export async function queryDocuments<T>(collectionName: string, constraints: Que
 }
 
 /**
+ * Paginated query result
+ */
+export interface PaginatedResult<T> {
+  data: T[];
+  lastDoc: DocumentSnapshot | null;
+  hasMore: boolean;
+}
+
+/**
+ * Query documents with pagination support
+ */
+export async function queryDocumentsPaginated<T>(
+  collectionName: string,
+  constraints: QueryConstraint[],
+  pageSize: number,
+  cursor?: DocumentSnapshot | null
+): Promise<PaginatedResult<T>> {
+  const collectionRef = collection(db, collectionName);
+
+  // Build constraints with cursor if provided
+  const allConstraints = cursor
+    ? [...constraints, startAfter(cursor), limit(pageSize)]
+    : [...constraints, limit(pageSize)];
+
+  const q = query(collectionRef, ...allConstraints);
+  const querySnapshot = await getDocs(q);
+
+  const data = querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as T[];
+
+  const lastDoc = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null;
+
+  return {
+    data,
+    lastDoc,
+    hasMore: querySnapshot.docs.length === pageSize,
+  };
+}
+
+/**
  * Subscribe to real-time updates for a document
  */
 export function subscribeToDocument<T>(
@@ -162,4 +205,4 @@ export function timestampToDate(timestamp: Timestamp | null | undefined): Date |
 }
 
 // Re-export commonly used Firestore functions for convenience
-export { where, orderBy, limit, startAfter, serverTimestamp, Timestamp };
+export { where, orderBy, limit, startAfter, serverTimestamp, Timestamp, type DocumentSnapshot };

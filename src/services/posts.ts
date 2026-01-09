@@ -5,11 +5,11 @@ import {
   getDocument,
   updateDocument,
   deleteDocument,
-  queryDocuments,
+  queryDocumentsPaginated,
   where,
   orderBy,
-  limit,
   serverTimestamp,
+  type DocumentSnapshot,
 } from './firebase/firestore';
 import { uploadFile, deleteFile, getPostMediaPath } from './firebase/storage';
 import { type Post, type PostMedia, type PostWithAuthor, type User } from '@/types';
@@ -238,28 +238,42 @@ export async function deletePost(postId: string, userId: string): Promise<void> 
 }
 
 /**
- * Get posts for a user's feed (posts from friends)
+ * Paginated feed result
  */
-export async function getFeedPosts(friendIds: string[], pageSize = 20): Promise<PostWithAuthor[]> {
+export interface PaginatedFeedResult {
+  posts: PostWithAuthor[];
+  cursor: DocumentSnapshot | null;
+  hasMore: boolean;
+}
+
+/**
+ * Get posts for a user's feed (posts from friends) with pagination
+ */
+export async function getFeedPosts(
+  friendIds: string[],
+  pageSize = 20,
+  cursor?: DocumentSnapshot | null
+): Promise<PaginatedFeedResult> {
   if (friendIds.length === 0) {
-    return [];
+    return { posts: [], cursor: null, hasMore: false };
   }
 
   // Firestore 'in' queries are limited to 30 items
   // For users with more friends, we'd need to batch queries
   const queryFriendIds = friendIds.slice(0, 30);
 
-  const posts = await queryDocuments<Post>(COLLECTIONS.POSTS, [
-    where('authorId', 'in', queryFriendIds),
-    orderBy('createdAt', 'desc'),
-    limit(pageSize),
-  ]);
+  const result = await queryDocumentsPaginated<Post>(
+    COLLECTIONS.POSTS,
+    [where('authorId', 'in', queryFriendIds), orderBy('createdAt', 'desc')],
+    pageSize,
+    cursor
+  );
 
   // Fetch author info for each post
   const postsWithAuthors: PostWithAuthor[] = [];
   const authorCache = new Map<string, User>();
 
-  for (const post of posts) {
+  for (const post of result.data) {
     let author = authorCache.get(post.authorId);
     if (!author) {
       const authorDoc = await getDocument<User>(COLLECTIONS.USERS, post.authorId);
@@ -282,16 +296,40 @@ export async function getFeedPosts(friendIds: string[], pageSize = 20): Promise<
     }
   }
 
-  return postsWithAuthors;
+  return {
+    posts: postsWithAuthors,
+    cursor: result.lastDoc,
+    hasMore: result.hasMore,
+  };
 }
 
 /**
- * Get posts by a specific user
+ * Paginated user posts result
  */
-export async function getUserPosts(userId: string, pageSize = 20): Promise<Post[]> {
-  return queryDocuments<Post>(COLLECTIONS.POSTS, [
-    where('authorId', '==', userId),
-    orderBy('createdAt', 'desc'),
-    limit(pageSize),
-  ]);
+export interface PaginatedUserPostsResult {
+  posts: Post[];
+  cursor: DocumentSnapshot | null;
+  hasMore: boolean;
+}
+
+/**
+ * Get posts by a specific user with pagination
+ */
+export async function getUserPosts(
+  userId: string,
+  pageSize = 20,
+  cursor?: DocumentSnapshot | null
+): Promise<PaginatedUserPostsResult> {
+  const result = await queryDocumentsPaginated<Post>(
+    COLLECTIONS.POSTS,
+    [where('authorId', '==', userId), orderBy('createdAt', 'desc')],
+    pageSize,
+    cursor
+  );
+
+  return {
+    posts: result.data,
+    cursor: result.lastDoc,
+    hasMore: result.hasMore,
+  };
 }

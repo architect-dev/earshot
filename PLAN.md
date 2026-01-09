@@ -124,20 +124,21 @@
   - [x] Photo preview/reorder
   - [x] Text body input
   - [x] Post submission
+  - [x] Upload progress indicator
   - [x] Post success feedback
-- [ ] Build Feed tab:
-  - [ ] Fetch friends' posts
-  - [ ] Reverse chronological sort
-  - [ ] Pull-to-refresh
-  - [ ] Infinite scroll pagination
-- [ ] Build PostCard component:
-  - [ ] Author info (photo, name)
-  - [ ] Media slideshow
-  - [ ] Position indicator (1/6)
-  - [ ] Text body
-  - [ ] Heart button
-  - [ ] Comment button
-  - [ ] Timestamp
+- [x] Build Feed tab:
+  - [x] Fetch friends' posts
+  - [x] Reverse chronological sort
+  - [x] Pull-to-refresh
+  - [x] Infinite scroll pagination
+- [x] Build PostCard component:
+  - [x] Author info (photo, name)
+  - [x] Media slideshow
+  - [x] Position indicator (1/6)
+  - [x] Text body
+  - [x] Heart button (hidden for own posts)
+  - [x] Comment button (hidden for own posts)
+  - [x] Timestamp display (relative < 1 week, absolute >= 1 week)
 - [ ] Build InteractionModal component:
   - [ ] Quoted content preview (matches DM appearance)
   - [ ] Heart mode (preview + send)
@@ -149,8 +150,15 @@
   - [ ] Pinch-to-zoom
   - [ ] Per-media heart/comment (triggers InteractionModal)
   - [ ] Close gesture/button
-- [ ] Implement post editing (text only)
-- [ ] Implement post deletion
+- [x] Implement post editing (text + media)
+  - [x] Edit text body
+  - [x] Add/remove/reorder photos
+  - [x] Upload progress indicator
+- [x] Implement post deletion
+- [x] Reusable components extracted:
+  - [x] PhotoGrid component
+  - [x] UploadProgress component
+  - [x] usePhotoPicker hook
 
 ### Phase 5: Direct Messages
 

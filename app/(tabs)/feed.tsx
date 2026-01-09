@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, Alert } from 'react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { View, FlatList, StyleSheet, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { type DocumentSnapshot } from 'firebase/firestore';
 import { ScreenContainer, Text, PageHeader, Modal, Button, ConfirmModal, Spacer } from '@/components/ui';
 import { PostCard } from '@/components/posts';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -10,6 +11,8 @@ import { getFriends } from '@/services/friends';
 import { getErrorMessage } from '@/utils/errors';
 import { type PostWithAuthor } from '@/types';
 
+const PAGE_SIZE = 20;
+
 export default function FeedScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -18,6 +21,12 @@ export default function FeedScreen() {
   const [posts, setPosts] = useState<PostWithAuthor[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Store cursor and friend IDs for pagination
+  const cursorRef = useRef<DocumentSnapshot | null>(null);
+  const friendIdsRef = useRef<string[]>([]);
 
   // Post options state
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
@@ -25,27 +34,55 @@ export default function FeedScreen() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const loadPosts = useCallback(async () => {
-    if (!user) return;
+  const loadPosts = useCallback(
+    async (isRefresh = false) => {
+      if (!user) return;
 
+      try {
+        // Get friend IDs first (only on initial load or refresh)
+        if (isRefresh || friendIdsRef.current.length === 0) {
+          const friends = await getFriends(user.uid);
+          friendIdsRef.current = friends.map((f) => f.user.id);
+          // Include own posts in feed
+          friendIdsRef.current.push(user.uid);
+        }
+
+        // Reset cursor on refresh
+        if (isRefresh) {
+          cursorRef.current = null;
+        }
+
+        // Fetch posts
+        const result = await getFeedPosts(friendIdsRef.current, PAGE_SIZE, null);
+        setPosts(result.posts);
+        cursorRef.current = result.cursor;
+        setHasMore(result.hasMore);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Error loading feed:', err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user]
+  );
+
+  const loadMorePosts = useCallback(async () => {
+    if (!user || loadingMore || !hasMore || !cursorRef.current) return;
+
+    setLoadingMore(true);
     try {
-      // Get friend IDs first
-      const friends = await getFriends(user.uid);
-      const friendIds = friends.map((f) => f.user.id);
-
-      // Include own posts in feed
-      friendIds.push(user.uid);
-
-      // Fetch posts
-      const feedPosts = await getFeedPosts(friendIds);
-      setPosts(feedPosts);
+      const result = await getFeedPosts(friendIdsRef.current, PAGE_SIZE, cursorRef.current);
+      setPosts((prev) => [...prev, ...result.posts]);
+      cursorRef.current = result.cursor;
+      setHasMore(result.hasMore);
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('Error loading feed:', err);
+      console.error('Error loading more posts:', err);
     } finally {
-      setLoading(false);
+      setLoadingMore(false);
     }
-  }, [user]);
+  }, [user, loadingMore, hasMore]);
 
   useEffect(() => {
     loadPosts();
@@ -53,7 +90,7 @@ export default function FeedScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadPosts();
+    await loadPosts(true);
     setRefreshing(false);
   };
 
@@ -139,6 +176,15 @@ export default function FeedScreen() {
     </View>
   );
 
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={theme.colors.gold} />
+      </View>
+    );
+  };
+
   return (
     <ScreenContainer padded={false}>
       <PageHeader title="Feed" style={styles.header} />
@@ -161,6 +207,9 @@ export default function FeedScreen() {
             />
           }
           ListEmptyComponent={renderEmpty}
+          ListFooterComponent={renderFooter}
+          onEndReached={loadMorePosts}
+          onEndReachedThreshold={0.5}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -211,5 +260,9 @@ const styles = StyleSheet.create({
   },
   optionsContainer: {
     paddingTop: 8,
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
 });
