@@ -9,7 +9,7 @@ import { MessageBubble, MessageInput, MessageContextModal } from '@/components/m
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getConversation } from '@/services/conversations';
-import { getConversationMessages, createMessage } from '@/services/messages';
+import { getConversationMessages, createMessage, markMessagesAsRead } from '@/services/messages';
 import { getDocument } from '@/services/firebase/firestore';
 import { COLLECTIONS } from '@/services/firebase/firestore';
 import { uploadFile, getMessageMediaPath } from '@/services/firebase/storage';
@@ -105,6 +105,18 @@ export default function ConversationScreen() {
       setMessages(initialMessages.messages);
       cursorRef.current = initialMessages.lastDoc;
       setHasMore(initialMessages.hasMore);
+
+      // Mark all unread messages as read
+      const unreadMessageIds = initialMessages.messages
+        .filter((msg) => !msg.readBy.includes(user.uid))
+        .map((msg) => msg.id);
+      if (unreadMessageIds.length > 0) {
+        // Don't await - mark as read in background
+        markMessagesAsRead(conversationId, user.uid, unreadMessageIds).catch((err) => {
+          // eslint-disable-next-line no-console
+          console.error('Error marking messages as read:', err);
+        });
+      }
 
       // Load user profiles for participants (including current user for consistency)
       const profiles = new Map<string, User>();
