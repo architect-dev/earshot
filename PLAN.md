@@ -172,19 +172,43 @@
   - [x] UploadProgress component
   - [x] usePhotoPicker hook
 
-### Phase 5: Direct Messages
+### Phase 5: Messages & Conversations
 
-**Estimated Effort:** 3-4 sessions
+**Estimated Effort:** 5-6 sessions
 
-- [ ] Create Conversations collection
-- [ ] Create Messages collection
+**Design Philosophy:** Build a unified conversation system that supports both direct messages (DMs) and group chats from the start. DMs are treated as 2-person conversations, allowing seamless integration.
+
+#### Data Model & Infrastructure
+
+- [ ] Create Conversations collection (unified for DMs and groups):
+  - [ ] Participants array (user IDs)
+  - [ ] Type field (`'dm'` | `'group'`) or derive from participant count
+  - [ ] Group name (null for DMs, required for groups)
+  - [ ] Created by (user ID)
+  - [ ] Created at (timestamp)
+  - [ ] Last message (reference or snapshot)
+  - [ ] Last message at (timestamp)
+  - [ ] Unread counts (per participant)
+- [ ] Create Messages collection:
+  - [ ] Conversation ID (reference)
+  - [ ] Sender ID (user ID)
+  - [ ] Content (text, media URL, voice URL)
+  - [ ] Type (`'text'` | `'photo'` | `'video'` | `'voice'` | `'heart'` | `'comment'`)
+  - [ ] Quoted content (for hearts/comments - post reference)
+  - [ ] Created at (timestamp)
+  - [ ] Read receipts (array of user IDs who have read)
+- [ ] Design services layer to handle both DM and group chat operations
+
+#### Core Messaging Features (DM-first implementation)
+
 - [ ] Build Messages tab:
-  - [ ] Conversations list
-  - [ ] Unread indicator
+  - [ ] Unified conversations list (DMs and groups)
+  - [ ] Unread indicator (per conversation)
   - [ ] Last message preview
   - [ ] Timestamp display
-- [ ] Build Conversation screen:
-  - [ ] Message list (reverse chronological)
+  - [ ] Conversation type indicator (optional)
+- [ ] Build Conversation screen (works for both DMs and groups):
+  - [ ] Message list (reverse chronological, infinite scroll)
   - [ ] Text input
   - [ ] Send button
   - [ ] Photo picker
@@ -192,9 +216,40 @@
   - [ ] Read receipts (delivered/read)
   - [ ] Quoted content display (for hearts/comments)
   - [ ] Mute/unmute conversation toggle
-- [ ] Implement heart-to-DM flow
-- [ ] Implement comment-to-DM flow
-- [ ] Real-time message updates (Firestore listeners)
+  - [ ] Conditional UI based on conversation type:
+    - [ ] DM: Show other user's name/avatar in header
+    - [ ] Group: Show group name and participant list/avatars
+    - [ ] Group: Show sender name in message bubbles
+- [ ] Implement heart-to-conversation flow:
+  - [ ] Create or find DM with post author
+  - [ ] Send heart message with quoted content
+- [ ] Implement comment-to-conversation flow:
+  - [ ] Create or find DM with post author
+  - [ ] Send comment message with quoted content
+- [ ] Real-time message updates (Firestore listeners for both types)
+
+#### Group Chat Features
+
+- [ ] Build group chat creation flow:
+  - [ ] Select participants (must be mutual friends with all existing members)
+  - [ ] Name the group chat
+  - [ ] Create conversation document with type='group'
+  - [ ] Validate mutual friend requirements
+- [ ] Group chat UI enhancements:
+  - [ ] Display group name in conversation header
+  - [ ] Show participant list/avatars in header
+  - [ ] Group message bubbles with sender identification
+  - [ ] Participant count display
+- [ ] Group chat management:
+  - [ ] Any member can add participants (must be mutual friends with all existing members)
+  - [ ] Any member can remove participants
+  - [ ] Any member can rename group chat
+  - [ ] Participants can leave group chat
+- [ ] Update PostInteractionModal:
+  - [ ] Detect existing conversations (DMs and groups) with post author
+  - [ ] Show conversation selection UI (DM vs group chats)
+  - [ ] Allow choosing destination before sending
+  - [ ] Create new DM if none exists
 
 ### Phase 6: Push Notifications
 
@@ -205,8 +260,9 @@
 - [ ] Request notification permissions
 - [ ] Store push tokens in Firestore
 - [ ] Set up Cloud Functions for triggers:
-  - [ ] New message notification
+  - [ ] New message notification (DM and group chat)
   - [ ] Friend request notification
+  - [ ] Group chat mention notification (future)
 - [ ] Handle notification tap (deep linking)
 
 ### Phase 7: Analytics & Crash Reporting
@@ -220,6 +276,7 @@
   - [ ] Post created
   - [ ] Message sent
   - [ ] Friend added
+  - [ ] Group chat created
 - [ ] Configure Sentry
 - [ ] Test crash reporting
 
@@ -242,6 +299,7 @@
 - [ ] Audit all data access patterns
 - [ ] Test blocked user restrictions
 - [ ] Test friend-only content access
+- [ ] Test group chat access restrictions (mutual friends only)
 - [ ] Implement rate limiting (Cloud Functions)
 - [ ] Validate all user inputs server-side
 
@@ -264,7 +322,7 @@
 
 - [ ] Loading states for all async operations
 - [ ] Error handling and user feedback
-- [ ] Empty states (no friends, no posts, no messages)
+- [ ] Empty states (no friends, no posts, no messages, no group chats)
 - [ ] Keyboard handling and avoidance
 - [ ] Pull-to-refresh everywhere relevant
 - [ ] Test on iOS simulator
@@ -433,8 +491,15 @@ earshot/
 - [ ] Send voice message
 - [ ] Mute/unmute conversation
 - [ ] Read receipts working
+- [ ] Create group chat (all participants are mutual friends)
+- [ ] Send message to group chat
+- [ ] Heart/comment post with group chat selection (choose between DM and group chat)
+- [ ] Add participant to group chat
+- [ ] Remove participant from group chat
+- [ ] Leave group chat
+- [ ] Rename group chat
 - [ ] Theme toggle works
-- [ ] Push notifications received
+- [ ] Push notifications received (DM and group chat)
 - [ ] Delete post
 - [ ] Delete account
 
@@ -471,10 +536,12 @@ The demo is ready for beta testers when:
 7. ✅ Users can view friends' posts in feed
 8. ✅ Users can heart/comment on posts (sends DM)
 9. ✅ Users can send/receive direct messages
-10. ✅ Push notifications work for messages and requests
-11. ✅ App works on both iOS and Android
-12. ✅ No critical crashes (Sentry monitored)
-13. ✅ Security rules properly restrict access
+10. ✅ Users can create and participate in group chats (Phase 6)
+11. ✅ Users can choose group chat when hearting/commenting on posts (if group chat exists)
+12. ✅ Push notifications work for messages and requests
+13. ✅ App works on both iOS and Android
+14. ✅ No critical crashes (Sentry monitored)
+15. ✅ Security rules properly restrict access (including group chat mutual friend validation)
 
 ---
 
