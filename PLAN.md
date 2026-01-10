@@ -224,19 +224,21 @@
   - [ ] Timestamp display
   - [ ] Conversation type indicator (optional)
 - [ ] Build Conversation screen (works for both DMs and groups):
-  - [ ] Message list (reverse chronological, infinite scroll)
+  - [ ] Message list (reverse chronological, infinite scroll - see details below)
   - [ ] Text input
   - [ ] Send button
   - [ ] Photo picker
   - [ ] Message bubbles (sent/received styling)
+  - [ ] Pending messages (50% opacity until confirmed sent)
   - [ ] Read receipts (delivered/read)
+  - [ ] Typing indicators (see details below)
   - [ ] Quoted content display:
     - [ ] Support quoted posts (from PostInteractionModal)
     - [ ] Support quoted messages (text, photo, voice)
     - [ ] Clickable quoted content:
       - [ ] Quoted post → Navigate to post detail page
-      - [ ] Quoted message → Scroll to original message in conversation
-  - [ ] Scroll-to-message functionality (when clicking quoted message)
+      - [ ] Quoted message → Scroll to original message in conversation (see details below)
+  - [ ] Scroll-to-message functionality (when clicking quoted message - see details below)
   - [ ] Long-press on messages to open MessageContextModal
   - [ ] Mute/unmute conversation toggle
   - [ ] Conditional UI based on conversation type:
@@ -284,6 +286,35 @@
   - [ ] UI: Show "Deleted message" placeholder in conversation
   - [ ] UI: Confirmation modal before deletion
 - [ ] Real-time message updates (Firestore listeners for both types)
+- [ ] Infinite scroll pagination for conversations:
+  - [ ] Load initial batch (50 messages, reverse chronological)
+  - [ ] Load more on scroll up (older messages)
+  - [ ] Track cursor and hasMore state
+  - [ ] Handle empty conversation state
+  - [ ] Handle network failures during pagination
+- [ ] Optimistic UI updates (pending messages):
+  - [ ] Add pending messages to state immediately on send
+  - [ ] Show pending messages with 50% opacity
+  - [ ] Match pending messages with real messages when they arrive (by content + timestamp)
+  - [ ] Handle send failures (mark as failed, allow retry)
+  - [ ] Prevent duplicate messages when real message arrives
+  - [ ] Handle race conditions (real message arrives before pending is added)
+- [ ] Scroll-to-message functionality:
+  - [ ] When quoted message is clicked, check if message is loaded
+  - [ ] If not loaded, fetch message with context (10 messages before/after)
+  - [ ] Merge context messages into existing list
+  - [ ] Scroll to target message using FlatList.scrollToItem()
+  - [ ] Highlight target message briefly (fade animation)
+  - [ ] Handle edge cases: deleted quoted message, network failure, very old messages
+- [ ] Typing indicators:
+  - [ ] Update typing state on text input (debounced, 500ms)
+  - [ ] Clear typing state on message send or input blur
+  - [ ] Store typing state in Firestore (conversations/{id}/typing/{userId})
+  - [ ] Listen to typing updates from other participants
+  - [ ] Display "User is typing..." below input area
+  - [ ] Handle multiple users typing in group chats ("Alice and Bob are typing...")
+  - [ ] Auto-cleanup typing state after 10 seconds of inactivity
+  - [ ] Handle network failures gracefully
 
 #### Group Chat Features
 

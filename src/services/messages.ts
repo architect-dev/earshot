@@ -140,6 +140,20 @@ export async function getConversationMessages(
 }
 
 /**
+ * Get the last message in a conversation (for preview)
+ */
+export async function getLastMessage(conversationId: string): Promise<Message | null> {
+  const result = await queryDocumentsPaginated<Message>(
+    COLLECTIONS.MESSAGES,
+    [where('conversationId', '==', conversationId), orderBy('createdAt', 'desc')],
+    1, // Only need the most recent message
+    null
+  );
+
+  return result.data.length > 0 ? result.data[0] : null;
+}
+
+/**
  * Mark messages as read
  */
 export async function markMessagesAsRead(conversationId: string, userId: string, messageIds: string[]): Promise<void> {
