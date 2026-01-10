@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Avatar, Text, Button } from '@/components/ui';
 import { type Timestamp } from 'firebase/firestore';
@@ -21,6 +22,7 @@ interface FriendRowProps {
   // For friends list
   onRemove?: () => void;
   onBlock?: () => void;
+  onOptionsPress?: () => void; // Three dots button for user management
   // Loading state
   loading?: boolean;
   // Request direction (for showing appropriate buttons)
@@ -60,6 +62,7 @@ export function FriendRow({
   onDecline,
   onCancel,
   onRemove,
+  onOptionsPress,
   loading = false,
   requestDirection,
 }: FriendRowProps) {
@@ -88,6 +91,19 @@ export function FriendRow({
           {user.lastSeen !== undefined && !online && ` · ${formatLastSeen(user.lastSeen)}`}
         </Text>
       </View>
+
+      {onOptionsPress && !showActions && (
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation();
+            onOptionsPress();
+          }}
+          style={styles.optionsButton}
+          hitSlop={8}
+        >
+          <FontAwesome6 name="ellipsis" size={16} color={theme.colors.muted} />
+        </Pressable>
+      )}
 
       {showActions && (
         <View style={styles.actions}>
@@ -137,5 +153,9 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: 8,
+  },
+  optionsButton: {
+    padding: 8,
+    marginLeft: 8,
   },
 });

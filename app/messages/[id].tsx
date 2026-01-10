@@ -428,6 +428,7 @@ export default function ConversationScreen() {
               getUserProfile={getUserProfile}
               getMessage={getMessageById}
               onLongPress={() => handleMessageLongPress(item as Message)}
+              onQuotedPostPress={(postId) => router.push(`/post/${postId}`)}
               onQuotedMessagePress={handleQuotedMessagePress}
             />
           );

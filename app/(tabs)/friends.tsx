@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, FlatList, Pressable, StyleSheet, Alert, RefreshControl } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ScreenContainer, Text, TextInput, Button, Modal, Avatar, PageHeader, Spacer } from '@/components/ui';
 import { FriendRow } from '@/components/friends';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -25,6 +26,7 @@ type TabType = 'friends' | 'requests' | 'blocked';
 export default function FriendsScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<TabType>('friends');
   const [refreshing, setRefreshing] = useState(false);
@@ -268,7 +270,13 @@ export default function FriendsScreen() {
           <FlatList
             data={filteredFriends}
             keyExtractor={(item) => item.friendshipId}
-            renderItem={({ item }) => <FriendRow user={item.user} onPress={() => setSelectedFriend(item)} />}
+            renderItem={({ item }) => (
+              <FriendRow
+                user={item.user}
+                onPress={() => router.push(`/user/${item.user.id}`)}
+                onOptionsPress={() => setSelectedFriend(item)}
+              />
+            )}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             ListEmptyComponent={
               <View style={styles.empty}>

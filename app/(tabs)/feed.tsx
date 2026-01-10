@@ -156,8 +156,7 @@ export default function FeedScreen() {
   };
 
   const handleAuthorPress = (post: PostWithAuthor) => {
-    // TODO: Navigate to user profile
-    Alert.alert('Profile', `View ${post.author.fullName}'s profile`);
+    router.push(`/user/${post.authorId}`);
   };
 
   const handleMediaPress = (post: PostWithAuthor, index: number) => {

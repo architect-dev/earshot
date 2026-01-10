@@ -89,6 +89,18 @@ function RootLayoutNav() {
             animation: 'slide_from_right',
           }}
         />
+        <Stack.Screen
+          name="post/[id]"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="user/[id]"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
       </Stack>
       <GlobalDebugMenu />
     </>
