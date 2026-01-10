@@ -41,6 +41,10 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
     }
   };
 
+  const handleRecordVoice = () => {
+    Alert.alert('Record Voice', 'This feature is not implemented yet.');
+  };
+
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.highlightLow }]}
@@ -69,9 +73,6 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
       )}
 
       <View style={styles.inputRow}>
-        <Pressable onPress={handlePickPhoto} disabled={disabled} style={styles.iconButton}>
-          <FontAwesome6 name="image" size={18} color={theme.colors.pine} />
-        </Pressable>
         <View style={styles.inputWrapper}>
           <TextInput
             placeholder="Type a message..."
@@ -82,13 +83,25 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
             editable={!disabled}
           />
         </View>
-        <Pressable
-          onPress={handleSend}
-          disabled={disabled || (!text.trim() && !quotedContent)}
-          style={[styles.sendButton, { opacity: disabled || (!text.trim() && !quotedContent) ? 0.5 : 1 }]}
-        >
-          <FontAwesome6 name="paper-plane" size={18} color={theme.colors.pine} />
-        </Pressable>
+        {!text.trim() && (
+          <>
+            <Pressable onPress={handlePickPhoto} disabled={disabled} style={styles.iconButton}>
+              <FontAwesome6 name="image" size={18} color={theme.colors.pine} />
+            </Pressable>
+            <Pressable onPress={handleRecordVoice} disabled={disabled} style={styles.iconButton}>
+              <FontAwesome6 name="microphone" size={18} color={theme.colors.pine} />
+            </Pressable>
+          </>
+        )}
+        {!!text.trim() && (
+          <Pressable
+            onPress={handleSend}
+            disabled={disabled || (!text.trim() && !quotedContent)}
+            style={[styles.sendButton, { opacity: disabled || (!text.trim() && !quotedContent) ? 0.5 : 1 }]}
+          >
+            <FontAwesome6 name="paper-plane" size={18} color={theme.colors.pine} />
+          </Pressable>
+        )}
       </View>
     </View>
   );
