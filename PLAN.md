@@ -243,6 +243,13 @@
   - [x] Message bubbles (sent/received styling)
   - [x] Pending messages (50% opacity until confirmed sent)
   - [x] Read receipts (delivered/read)
+  - [ ] Timestamp display improvements:
+    - [ ] Instagram-style swipe left to reveal timestamp (hide timestamp by default, show on swipe)
+    - [ ] Insert time breaks between messages:
+      - [ ] If messages < 24hrs old: insert break if time difference > 1 hour (format: "4:11pm")
+      - [ ] If messages >= 24hrs old: insert break when days are different (format: "Jan 10th")
+      - [ ] Display breaks centered between message groups
+      - [ ] Format: "4:11pm" for same day, "Jan 10th" for different days
   - [ ] Typing indicators (see details below)
   - [x] Quoted content display:
     - [x] Support quoted posts (from PostInteractionModal)
@@ -263,14 +270,14 @@
     - [x] DM: Show other user's name/avatar in header
     - [ ] Group: Show group name and participant list/avatars
     - [x] Group: Show sender name in message bubbles
-- [ ] Implement heart-to-conversation flow:
-  - [ ] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
-  - [ ] Send heart message with quoted post content
-  - [ ] Support sending to group chats (if user is in group with post author)
-- [ ] Implement comment-to-conversation flow:
-  - [ ] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
-  - [ ] Send comment message with quoted post content
-  - [ ] Support sending to group chats (if user is in group with post author)
+- [x] Implement heart-to-conversation flow:
+  - [x] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
+  - [x] Send heart message with quoted post content (type='heart', no content)
+  - [x] Support sending to group chats (if user is in group with post author)
+- [x] Implement comment-to-conversation flow:
+  - [x] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
+  - [x] Send comment message with quoted post content
+  - [x] Support sending to group chats (if user is in group with post author)
 - [x] Build MessageContextModal component:
   - [x] Triggered by long-press on any message in conversation
   - [x] Shows interaction options based on message state and ownership:
@@ -353,11 +360,12 @@
   - [ ] Any member can remove participants
   - [ ] Any member can rename group chat
   - [ ] Participants can leave group chat
-- [ ] Update PostInteractionModal:
-  - [ ] Detect existing conversations (DMs and groups) with post author
-  - [ ] Show conversation selection UI (DM vs group chats)
-  - [ ] Allow choosing destination before sending
-  - [ ] Create new DM if none exists
+- [x] Update PostInteractionModal:
+  - [x] Detect existing conversations (DMs and groups) with post author
+  - [x] Show conversation selection UI (DM vs group chats)
+  - [x] Allow choosing destination before sending
+  - [x] Create new DM if none exists
+  - [x] Use QuotedContent component for post preview
 
 ### Phase 6: Push Notifications
 
@@ -592,8 +600,8 @@ earshot/
 - [ ] Block/unblock user
 - [ ] Create post with photos
 - [ ] View feed
-- [ ] Heart a post
-- [ ] Comment on a post
+  - [x] Heart a post (sends to conversation with quoted post)
+  - [x] Comment on a post (sends to conversation with quoted post)
   - [x] Send text message
   - [x] Send photo in DM
   - [ ] Send voice message
