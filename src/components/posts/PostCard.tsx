@@ -15,6 +15,7 @@ interface PostCardProps {
   onMediaPress?: (index: number) => void;
   onOptionsPress?: () => void;
   isOwner?: boolean;
+  disableAuthorPress?: boolean; // Disable author press (e.g., when already on user's feed)
 }
 
 export function PostCard({
@@ -25,6 +26,7 @@ export function PostCard({
   onMediaPress,
   onOptionsPress,
   isOwner = false,
+  disableAuthorPress = false,
 }: PostCardProps) {
   const { theme } = useTheme();
 
@@ -32,7 +34,11 @@ export function PostCard({
     <View style={[styles.container, { borderBottomColor: theme.colors.highlightLow }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={onAuthorPress} style={styles.authorInfo}>
+        <Pressable
+          onPress={disableAuthorPress ? undefined : onAuthorPress}
+          style={styles.authorInfo}
+          disabled={disableAuthorPress}
+        >
           <Avatar source={post.author.profilePhotoUrl} name={post.author.fullName} size="sm" />
           <View style={styles.authorText}>
             <Text size="sm" weight="semibold">
@@ -44,7 +50,7 @@ export function PostCard({
           </View>
         </Pressable>
 
-        {isOwner && onOptionsPress && (
+        {onOptionsPress && (
           <Pressable onPress={onOptionsPress} style={styles.optionsButton} hitSlop={8}>
             <FontAwesome6 name="ellipsis" size={16} color={theme.colors.muted} />
           </Pressable>

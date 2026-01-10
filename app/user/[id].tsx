@@ -4,12 +4,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { type DocumentSnapshot } from 'firebase/firestore';
-import { ScreenContainer, Text, Avatar } from '@/components/ui';
+import { ScreenContainer, Text, Avatar, Modal, Button } from '@/components/ui';
 import { PostCard } from '@/components/posts';
 import { PostInteractionModal } from '@/components/posts/PostInteractionModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserPosts } from '@/services/posts';
+import { findOrCreateDM } from '@/services/conversations';
 import { createMessage as createMessageService } from '@/services/messages';
 import { getDocument } from '@/services/firebase/firestore';
 import { COLLECTIONS } from '@/services/firebase/firestore';
@@ -35,6 +36,8 @@ export default function UserFeedScreen() {
   const [interactionPost, setInteractionPost] = useState<PostWithAuthor | null>(null);
   const [interactionType, setInteractionType] = useState<'heart' | 'comment'>('heart');
   const [sendingInteraction, setSendingInteraction] = useState(false);
+  const [showNonOwnerModal, setShowNonOwnerModal] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
 
   const loadUserAndPosts = useCallback(async () => {
     if (!id) return;
@@ -143,14 +146,38 @@ export default function UserFeedScreen() {
     Alert.alert('Media', `View media ${index + 1} of ${post.media.length}`);
   };
 
+  const handleOptionsPress = (post: PostWithAuthor) => {
+    setSelectedPost(post);
+    if (post.authorId === user?.uid) {
+      // Owner options - TODO: implement edit/delete for user feed
+      Alert.alert('Post Options', 'Edit/Delete options coming soon');
+    } else {
+      setShowNonOwnerModal(true);
+    }
+  };
+
+  const handleOpenDM = async () => {
+    if (!selectedPost || !user) return;
+
+    try {
+      const dm = await findOrCreateDM(user.uid, selectedPost.authorId);
+      setShowNonOwnerModal(false);
+      setSelectedPost(null);
+      router.push(`/messages/${dm.id}`);
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    }
+  };
+
   const renderPost = ({ item }: { item: PostWithAuthor }) => (
     <PostCard
       post={item}
-      onAuthorPress={() => router.push(`/user/${item.authorId}`)}
       onHeartPress={() => handleHeartPress(item)}
       onCommentPress={() => handleCommentPress(item)}
       onMediaPress={(index) => handleMediaPress(item, index)}
+      onOptionsPress={() => handleOptionsPress(item)}
       isOwner={item.authorId === user?.uid}
+      disableAuthorPress={true}
     />
   );
 
@@ -238,6 +265,20 @@ export default function UserFeedScreen() {
           loading={sendingInteraction}
         />
       )}
+
+      {/* Post Options Modal (Non-Owner) */}
+      <Modal
+        visible={showNonOwnerModal}
+        onClose={() => {
+          setShowNonOwnerModal(false);
+          setSelectedPost(null);
+        }}
+        title="Post Options"
+      >
+        <View style={styles.optionsContainer}>
+          <Button title="OPEN DM" variant="secondary" onPress={handleOpenDM} fullWidth />
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -277,5 +318,8 @@ const styles = StyleSheet.create({
   footerLoader: {
     padding: 16,
     alignItems: 'center',
+  },
+  optionsContainer: {
+    gap: 12,
   },
 });

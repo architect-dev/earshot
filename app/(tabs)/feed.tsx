@@ -8,6 +8,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getFeedPosts, deletePost } from '@/services/posts';
 import { getFriends } from '@/services/friends';
+import { findOrCreateDM } from '@/services/conversations';
 import { createMessage } from '@/services/messages';
 import { getErrorMessage } from '@/utils/errors';
 import { type PostWithAuthor, type QuotedContent } from '@/types';
@@ -32,6 +33,7 @@ export default function FeedScreen() {
   // Post options state
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
   const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const [showNonOwnerModal, setShowNonOwnerModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -166,7 +168,24 @@ export default function FeedScreen() {
 
   const handleOptionsPress = (post: PostWithAuthor) => {
     setSelectedPost(post);
-    setShowOptionsModal(true);
+    if (post.authorId === user?.uid) {
+      setShowOptionsModal(true);
+    } else {
+      setShowNonOwnerModal(true);
+    }
+  };
+
+  const handleOpenDM = async () => {
+    if (!selectedPost || !user) return;
+
+    try {
+      const dm = await findOrCreateDM(user.uid, selectedPost.authorId);
+      setShowNonOwnerModal(false);
+      setSelectedPost(null);
+      router.push(`/messages/${dm.id}`);
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    }
   };
 
   const handleEditPress = () => {
@@ -199,6 +218,7 @@ export default function FeedScreen() {
 
   const closeModals = () => {
     setShowOptionsModal(false);
+    setShowNonOwnerModal(false);
     setShowDeleteConfirm(false);
     setSelectedPost(null);
   };
@@ -279,12 +299,19 @@ export default function FeedScreen() {
         loading={sendingInteraction}
       />
 
-      {/* Post Options Modal */}
+      {/* Post Options Modal (Owner) */}
       <Modal visible={showOptionsModal} onClose={closeModals} title="Post Options">
         <View style={styles.optionsContainer}>
           <Button title="EDIT" variant="secondary" onPress={handleEditPress} fullWidth />
           <Spacer size={12} />
           <Button title="DELETE" variant="error" onPress={handleDeletePress} fullWidth />
+        </View>
+      </Modal>
+
+      {/* Post Options Modal (Non-Owner) */}
+      <Modal visible={showNonOwnerModal} onClose={closeModals} title="Post Options">
+        <View style={styles.optionsContainer}>
+          <Button title="OPEN DM" variant="secondary" onPress={handleOpenDM} fullWidth />
         </View>
       </Modal>
 

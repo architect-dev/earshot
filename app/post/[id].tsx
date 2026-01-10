@@ -3,12 +3,13 @@ import { View, StyleSheet, Alert, ActivityIndicator, Pressable } from 'react-nat
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6 } from '@expo/vector-icons';
-import { ScreenContainer, Text, Avatar } from '@/components/ui';
+import { ScreenContainer, Text, Avatar, Modal, Button } from '@/components/ui';
 import { PostCard } from '@/components/posts';
 import { PostInteractionModal } from '@/components/posts/PostInteractionModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getPostWithAuthor } from '@/services/posts';
+import { findOrCreateDM } from '@/services/conversations';
 import { createMessage as createMessageService } from '@/services/messages';
 import { getDocument } from '@/services/firebase/firestore';
 import { COLLECTIONS } from '@/services/firebase/firestore';
@@ -26,9 +27,9 @@ export default function PostDetailScreen() {
   const [author, setAuthor] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInteractionModal, setShowInteractionModal] = useState(false);
-  const [interactionPost, setInteractionPost] = useState<PostWithAuthor | null>(null);
   const [interactionType, setInteractionType] = useState<'heart' | 'comment'>('heart');
   const [sendingInteraction, setSendingInteraction] = useState(false);
+  const [showNonOwnerModal, setShowNonOwnerModal] = useState(false);
 
   const loadPost = useCallback(async () => {
     if (!id) return;
@@ -60,14 +61,12 @@ export default function PostDetailScreen() {
 
   const handleHeartPress = () => {
     if (!post) return;
-    setInteractionPost(post);
     setInteractionType('heart');
     setShowInteractionModal(true);
   };
 
   const handleCommentPress = () => {
     if (!post) return;
-    setInteractionPost(post);
     setInteractionType('comment');
     setShowInteractionModal(true);
   };
@@ -105,7 +104,6 @@ export default function PostDetailScreen() {
       });
 
       setShowInteractionModal(false);
-      setInteractionPost(null);
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
       throw err;
@@ -117,6 +115,27 @@ export default function PostDetailScreen() {
   const handleMediaPress = () => {
     // TODO: Open MediaViewer
     Alert.alert('Media', 'Media viewer coming soon');
+  };
+
+  const handleOptionsPress = () => {
+    if (post && post.authorId === user?.uid) {
+      // Owner options - TODO: implement edit/delete for post detail
+      Alert.alert('Post Options', 'Edit/Delete options coming soon');
+    } else if (post) {
+      setShowNonOwnerModal(true);
+    }
+  };
+
+  const handleOpenDM = async () => {
+    if (!post || !user) return;
+
+    try {
+      const dm = await findOrCreateDM(user.uid, post.authorId);
+      setShowNonOwnerModal(false);
+      router.push(`/messages/${dm.id}`);
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    }
   };
 
   if (loading) {
@@ -162,11 +181,12 @@ export default function PostDetailScreen() {
       <View style={styles.content}>
         <PostCard
           post={post}
-          onAuthorPress={() => router.push(`/user/${post.authorId}`)}
           onHeartPress={handleHeartPress}
           onCommentPress={handleCommentPress}
           onMediaPress={handleMediaPress}
+          onOptionsPress={handleOptionsPress}
           isOwner={post.authorId === user?.uid}
+          disableAuthorPress={true}
         />
       </View>
 
@@ -176,7 +196,6 @@ export default function PostDetailScreen() {
           visible={showInteractionModal}
           onClose={() => {
             setShowInteractionModal(false);
-            setInteractionPost(null);
           }}
           onSend={handleSendInteraction}
           post={post}
@@ -184,6 +203,13 @@ export default function PostDetailScreen() {
           loading={sendingInteraction}
         />
       )}
+
+      {/* Post Options Modal (Non-Owner) */}
+      <Modal visible={showNonOwnerModal} onClose={() => setShowNonOwnerModal(false)} title="Post Options">
+        <View style={styles.optionsContainer}>
+          <Button title="OPEN DM" variant="secondary" onPress={handleOpenDM} fullWidth />
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -219,5 +245,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  optionsContainer: {
+    gap: 12,
   },
 });
