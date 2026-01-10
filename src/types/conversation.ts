@@ -1,0 +1,57 @@
+import { type Timestamp } from 'firebase/firestore';
+
+export type ConversationType = 'dm' | 'group';
+
+export interface QuotedPost {
+  type: 'post';
+  postId: string;
+  preview: {
+    text?: string;
+    mediaUrl?: string;
+    authorName: string;
+    authorUsername: string;
+  };
+}
+
+export interface QuotedMessage {
+  type: 'message';
+  messageId: string; // Only message ID needed (same conversation)
+  preview: {
+    text?: string;
+    mediaUrl?: string;
+    voiceUrl?: string;
+    senderName: string;
+    senderUsername: string;
+  };
+}
+
+export type QuotedContent = QuotedPost | QuotedMessage;
+
+export interface Conversation {
+  id: string;
+  participants: string[]; // Array of user IDs
+  type: ConversationType; // 'dm' | 'group'
+  groupName: string | null; // null for DMs, required for groups
+  createdBy: string; // User ID
+  createdAt: Timestamp;
+  lastMessageAt: Timestamp | null; // Timestamp for sorting, updated when new messages arrive
+  unreadCounts: Record<string, number>; // userId -> unread count
+  mutedBy: string[]; // Array of user IDs who have muted this conversation
+}
+
+// For creating a new conversation
+export interface CreateConversationData {
+  participants: string[];
+  type: ConversationType;
+  groupName?: string; // Required if type='group'
+  createdBy: string;
+}
+
+// For updating conversation
+export interface UpdateConversationData {
+  participants?: string[];
+  groupName?: string;
+  lastMessageAt?: Timestamp | null;
+  unreadCounts?: Record<string, number>;
+  mutedBy?: string[];
+}

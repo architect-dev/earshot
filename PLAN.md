@@ -156,6 +156,12 @@
   - [x] Applies crop data (scale, x, y) to position images
   - [x] Swipeable slides
   - [x] Position indicator and dot navigation
+- [ ] Build Post Detail page:
+  - [ ] Dedicated route for viewing a single post (`/post/[id]`)
+  - [ ] Full post display (same as PostCard but standalone)
+  - [ ] Heart and comment buttons
+  - [ ] Navigation from quoted content in messages
+  - [ ] Back navigation
 - [ ] Build MediaViewer (full screen):
   - [ ] Swipeable slides
   - [ ] Pinch-to-zoom
@@ -194,7 +200,12 @@
   - [ ] Sender ID (user ID)
   - [ ] Content (text, media URL, voice URL)
   - [ ] Type (`'text'` | `'photo'` | `'video'` | `'voice'` | `'heart'` | `'comment'`)
-  - [ ] Quoted content (for hearts/comments - post reference)
+  - [ ] Quoted content (optional):
+    - [ ] Type (`'post'` | `'message'`)
+    - [ ] Post reference (if type='post')
+    - [ ] Message reference (if type='message') - message ID only (same conversation)
+    - [ ] Preview data (text preview, media thumbnail, sender info)
+    - [ ] Constraint: Quoted messages must be from the same conversation
   - [ ] Created at (timestamp)
   - [ ] Read receipts (array of user IDs who have read)
 - [ ] Design services layer to handle both DM and group chat operations
@@ -214,18 +225,38 @@
   - [ ] Photo picker
   - [ ] Message bubbles (sent/received styling)
   - [ ] Read receipts (delivered/read)
-  - [ ] Quoted content display (for hearts/comments)
+  - [ ] Quoted content display:
+    - [ ] Support quoted posts (from PostInteractionModal)
+    - [ ] Support quoted messages (text, photo, voice)
+    - [ ] Clickable quoted content:
+      - [ ] Quoted post → Navigate to post detail page
+      - [ ] Quoted message → Scroll to original message in conversation
+  - [ ] Scroll-to-message functionality (when clicking quoted message)
+  - [ ] Message quoting UI (long-press or quote button on messages)
   - [ ] Mute/unmute conversation toggle
   - [ ] Conditional UI based on conversation type:
     - [ ] DM: Show other user's name/avatar in header
     - [ ] Group: Show group name and participant list/avatars
     - [ ] Group: Show sender name in message bubbles
 - [ ] Implement heart-to-conversation flow:
-  - [ ] Create or find DM with post author
-  - [ ] Send heart message with quoted content
+  - [ ] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
+  - [ ] Send heart message with quoted post content
+  - [ ] Support sending to group chats (if user is in group with post author)
 - [ ] Implement comment-to-conversation flow:
-  - [ ] Create or find DM with post author
-  - [ ] Send comment message with quoted content
+  - [ ] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
+  - [ ] Send comment message with quoted post content
+  - [ ] Support sending to group chats (if user is in group with post author)
+- [ ] Implement message quoting flow:
+  - [ ] Long-press or quote button on any message in conversation
+  - [ ] Show quote preview (text, photo thumbnail, voice indicator)
+  - [ ] Send new message with quoted message reference
+  - [ ] Support quoting text, photo, and voice messages
+  - [ ] Constraint: Messages can only be quoted within the same conversation
+- [ ] Implement message deletion:
+  - [ ] Soft delete (mark as deleted, don't remove from database)
+  - [ ] Strip all content (text, media, voice, quoted content)
+  - [ ] Show "Deleted message" placeholder in UI
+  - [ ] Only sender can delete their own messages
 - [ ] Real-time message updates (Firestore listeners for both types)
 
 #### Group Chat Features
@@ -235,6 +266,8 @@
   - [ ] Name the group chat
   - [ ] Create conversation document with type='group'
   - [ ] Validate mutual friend requirements
+  - [ ] Require sending first message immediately after creation
+  - [ ] Pre-fill message input with "Send the group a hello message" placeholder/text
 - [ ] Group chat UI enhancements:
   - [ ] Display group name in conversation header
   - [ ] Show participant list/avatars in header
@@ -489,6 +522,10 @@ earshot/
 - [ ] Send text message
 - [ ] Send photo in DM
 - [ ] Send voice message
+- [ ] Quote a message in conversation (text, photo, voice)
+- [ ] Click quoted message → scrolls to original message
+- [ ] Click quoted post → opens post detail page
+- [ ] View post detail page (from quoted content)
 - [ ] Mute/unmute conversation
 - [ ] Read receipts working
 - [ ] Create group chat (all participants are mutual friends)
