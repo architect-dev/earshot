@@ -11,3 +11,5 @@ export interface Profile {
   profilePhotoUrl: string | null;
   lastSeen: Timestamp | null;
 }
+
+export type GetProfileByIdFn = (userId: string) => Profile | undefined;

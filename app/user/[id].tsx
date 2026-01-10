@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, FlatList, StyleSheet, Alert, ActivityIndicator, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +21,7 @@ const PAGE_SIZE = 20;
 export default function UserFeedScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { getFriendById } = useFriends();
+  const { getProfileById } = useFriends();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -39,14 +39,12 @@ export default function UserFeedScreen() {
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
 
   // Get user profile from FriendsContext
-  const userProfile = id ? getFriendById(id)?.user : undefined;
+  const profile = useMemo(() => (id ? getProfileById(id) : undefined), [id, getProfileById]);
 
   const loadUserAndPosts = useCallback(async () => {
     if (!id) return;
 
-    // Check if user is in FriendsContext (all users are friends)
-    const friend = getFriendById(id);
-    if (!friend) {
+    if (!profile) {
       Alert.alert('Error', 'User not found');
       router.back();
       return;
@@ -55,7 +53,7 @@ export default function UserFeedScreen() {
     try {
       // Load initial posts
       const result = await getUserPosts(id, PAGE_SIZE);
-      setPosts(result.posts.map((p) => ({ ...p, author: friend.user })));
+      setPosts(result.posts.map((p) => ({ ...p, author: profile })));
       cursorRef.current = result.cursor;
       setHasMore(result.hasMore);
     } catch (err) {
@@ -64,7 +62,7 @@ export default function UserFeedScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, router, getFriendById]);
+  }, [id, router, profile]);
 
   useEffect(() => {
     loadUserAndPosts();
@@ -73,13 +71,12 @@ export default function UserFeedScreen() {
   const loadMorePosts = useCallback(async () => {
     if (!id || loadingMore || !hasMore || !cursorRef.current) return;
 
-    const friend = getFriendById(id);
-    if (!friend) return;
+    if (!profile) return;
 
     setLoadingMore(true);
     try {
       const result = await getUserPosts(id, PAGE_SIZE, cursorRef.current);
-      const postsWithAuthor = result.posts.map((p) => ({ ...p, author: friend.user }));
+      const postsWithAuthor = result.posts.map((p) => ({ ...p, author: profile }));
       setPosts((prev) => [...prev, ...postsWithAuthor]);
       cursorRef.current = result.cursor;
       setHasMore(result.hasMore);
@@ -89,7 +86,7 @@ export default function UserFeedScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [id, loadingMore, hasMore, getFriendById]);
+  }, [id, loadingMore, hasMore, profile]);
 
   const handleHeartPress = (post: PostWithAuthor) => {
     setInteractionPost(post);
@@ -204,7 +201,7 @@ export default function UserFeedScreen() {
     );
   }
 
-  if (!userProfile) {
+  if (!profile) {
     return null;
   }
 
@@ -226,14 +223,9 @@ export default function UserFeedScreen() {
           <FontAwesome6 name="chevron-left" size={18} color={theme.colors.text} />
         </Pressable>
         <View style={styles.headerContent}>
-          <Avatar
-            source={userProfile.profilePhotoUrl}
-            name={userProfile.fullName}
-            size="sm"
-            style={styles.headerAvatar}
-          />
+          <Avatar source={profile.profilePhotoUrl} name={profile.fullName} size="sm" style={styles.headerAvatar} />
           <Text size="lg" weight="semibold" style={styles.headerTitle}>
-            {userProfile.fullName}
+            {profile.fullName}
           </Text>
         </View>
       </View>

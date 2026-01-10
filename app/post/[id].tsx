@@ -18,7 +18,7 @@ import { type PostWithAuthor, type QuotedContent } from '@/types';
 export default function PostDetailScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { getFriendById } = useFriends();
+  const { getProfileById } = useFriends();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,7 +34,7 @@ export default function PostDetailScreen() {
     if (!id) return;
 
     try {
-      const postData = await getPostWithAuthor(id, getFriendById);
+      const postData = await getPostWithAuthor(id, getProfileById);
       if (!postData) {
         Alert.alert('Error', 'Post not found');
         router.back();
@@ -48,7 +48,7 @@ export default function PostDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, router, getFriendById]);
+  }, [id, router, getProfileById]);
 
   useEffect(() => {
     loadPost();

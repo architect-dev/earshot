@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { getFriends } from '@/services/friends';
 import { type FriendWithProfile } from '@/types';
+import { type GetProfileByIdFn, type Profile } from '@/types/profile';
 import { useAuth } from './AuthContext';
 
 interface FriendsContextValue {
@@ -10,6 +11,7 @@ interface FriendsContextValue {
   error: Error | null;
   refreshFriends: () => Promise<void>;
   getFriendById: (userId: string) => FriendWithProfile | undefined;
+  getProfileById: GetProfileByIdFn;
   areFriends: (userId1: string, userId2: string) => boolean;
 }
 
@@ -20,7 +22,7 @@ interface FriendsProviderProps {
 }
 
 export function FriendsProvider({ children }: FriendsProviderProps) {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -59,6 +61,15 @@ export function FriendsProvider({ children }: FriendsProviderProps) {
     [friends]
   );
 
+  // Get profile by user ID (includes current user)
+  const getProfileById = useCallback(
+    (userId: string): Profile | undefined => {
+      if (userProfile != null && userId === userProfile.id) return userProfile;
+      return friends.find((f) => f.user.id === userId)?.user;
+    },
+    [friends, userProfile]
+  );
+
   // Check if two users are friends (using cached data)
   // Note: This context only has the current user's friends, so we can only check
   // if the current user is friends with userId2. For general areFriends checks,
@@ -92,6 +103,7 @@ export function FriendsProvider({ children }: FriendsProviderProps) {
     error,
     refreshFriends: loadFriends,
     getFriendById,
+    getProfileById,
     areFriends,
   };
 

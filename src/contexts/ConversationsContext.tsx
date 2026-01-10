@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { getUserConversations } from '@/services/conversations';
 import { subscribeToQuery, COLLECTIONS, where, orderBy } from '@/services/firebase/firestore';
-import { FriendWithProfile, type Conversation } from '@/types';
-import { type Profile } from '@/types/profile';
+import { type Conversation } from '@/types';
+import { GetProfileByIdFn, type Profile } from '@/types/profile';
 import { useAuth } from './AuthContext';
 import { useFriends } from './FriendsContext';
 
@@ -12,16 +12,13 @@ export interface EnrichedConversation extends Conversation {
 }
 
 // Helper function to enrich a conversation with friend data
-function enrichConversation(
-  conv: Conversation,
-  getFriendById: (userId: string) => FriendWithProfile | undefined
-): EnrichedConversation {
+function enrichConversation(conv: Conversation, getProfileById: GetProfileByIdFn): EnrichedConversation {
   const participantProfiles: Profile[] = [];
 
   // Enrich with all participants' profiles from FriendsContext
   for (const participantId of conv.participants) {
-    const friend = getFriendById(participantId);
-    if (friend) participantProfiles.push(friend.user);
+    const profile = getProfileById(participantId);
+    if (profile != null) participantProfiles.push(profile);
   }
 
   return {
@@ -48,7 +45,7 @@ interface ConversationsProviderProps {
 
 export function ConversationsProvider({ children }: ConversationsProviderProps) {
   const { user } = useAuth();
-  const { loading: friendsLoading, getFriendById } = useFriends();
+  const { loading: friendsLoading, getProfileById } = useFriends();
   const [conversations, setConversations] = useState<EnrichedConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -77,7 +74,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
       const userConversations = await getUserConversations(user.uid);
 
       // Enrich conversations with friend data
-      const enriched = userConversations.map((conv) => enrichConversation(conv, getFriendById));
+      const enriched = userConversations.map((conv) => enrichConversation(conv, getProfileById));
 
       setConversations(enriched);
     } catch (err) {
@@ -87,7 +84,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
     } finally {
       setLoading(false);
     }
-  }, [user, getFriendById, friendsLoading]);
+  }, [user, getProfileById, friendsLoading]);
 
   // Load conversations when user changes
   useEffect(() => {
@@ -133,7 +130,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
             };
 
             // Enrich the conversation with friend data
-            return enrichConversation(mergedConv, getFriendById);
+            return enrichConversation(mergedConv, getProfileById);
           });
 
           return merged;
@@ -149,7 +146,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
         conversationsUnsubscribeRef.current = null;
       }
     };
-  }, [user, getFriendById]);
+  }, [user, getProfileById]);
 
   // Get conversation by ID
   const getConversationById = useCallback(

@@ -12,7 +12,7 @@ import {
   type DocumentSnapshot,
 } from './firebase/firestore';
 import { uploadFile, deleteFile, getPostMediaPath } from './firebase/storage';
-import { FriendWithProfile, type Post, type PostMedia, type PostWithAuthor } from '@/types';
+import { type Post, type PostMedia, type PostWithAuthor, type GetProfileByIdFn } from '@/types';
 import { type PhotoItem } from '@/components/posts';
 import { calculateAspectRatio, clampAspectRatio } from '@/utils/media';
 
@@ -165,14 +165,17 @@ export async function getPost(postId: string): Promise<Post | null> {
  * Get a post with author information
  * Uses FriendsContext for author data if provided (all users are friends)
  */
-export async function getPostWithAuthor(postId: string, getFriendById: FriendLookup): Promise<PostWithAuthor | null> {
+export async function getPostWithAuthor(
+  postId: string,
+  getProfileById: GetProfileByIdFn
+): Promise<PostWithAuthor | null> {
   const post = await getPost(postId);
   if (!post) return null;
 
-  const author = getFriendById(post.authorId);
+  const author = getProfileById(post.authorId);
   if (!author) return null;
 
-  return { ...post, author: author.user };
+  return { ...post, author };
 }
 
 /**
@@ -312,16 +315,13 @@ export interface PaginatedFeedResult {
   hasMore: boolean;
 }
 
-// Type for friend lookup function (from FriendsContext)
-export type FriendLookup = (userId: string) => FriendWithProfile | undefined;
-
 /**
  * Get posts for a user's feed (posts from friends) with pagination
  * Uses FriendsContext for author data (all users are friends)
  */
 export async function getFeedPosts(
   friendIds: string[],
-  getFriendById: FriendLookup,
+  getProfileById: GetProfileByIdFn,
   pageSize = 20,
   cursor?: DocumentSnapshot | null
 ): Promise<PaginatedFeedResult> {
@@ -340,16 +340,18 @@ export async function getFeedPosts(
     cursor
   );
 
+  console.log({ queryFriendIds, cursor, result });
+
   // Enrich posts with author info from FriendsContext (no Firestore fetch needed)
   const postsWithAuthors: PostWithAuthor[] = [];
 
   for (const post of result.data) {
-    const friend = getFriendById(post.authorId);
-    if (!friend) continue;
+    const author = getProfileById(post.authorId);
+    if (!author) continue;
 
     postsWithAuthors.push({
       ...post,
-      author: friend.user,
+      author,
     });
   }
 

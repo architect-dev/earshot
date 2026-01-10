@@ -18,7 +18,7 @@ const PAGE_SIZE = 20;
 export default function FeedScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { friendIds, getFriendById } = useFriends();
+  const { friendIds, getProfileById } = useFriends();
   const router = useRouter();
 
   const [posts, setPosts] = useState<PostWithAuthor[]>([]);
@@ -69,7 +69,7 @@ export default function FeedScreen() {
         }
 
         // Fetch posts
-        const result = await getFeedPosts(feedUserIds, getFriendById, PAGE_SIZE, cursorRef.current);
+        const result = await getFeedPosts(feedUserIds, getProfileById, PAGE_SIZE, cursorRef.current);
         setPosts(result.posts);
         cursorRef.current = result.cursor;
         cursorFeedUserIdsRef.current = feedUserIds; // Update tracked IDs
@@ -81,7 +81,7 @@ export default function FeedScreen() {
         setLoading(false);
       }
     },
-    [user, friendIds, getFriendById]
+    [user, friendIds, getProfileById]
   );
 
   const loadMorePosts = useCallback(async () => {
@@ -101,7 +101,7 @@ export default function FeedScreen() {
         return;
       }
 
-      const result = await getFeedPosts(feedUserIds, getFriendById, PAGE_SIZE, cursorRef.current);
+      const result = await getFeedPosts(feedUserIds, getProfileById, PAGE_SIZE, cursorRef.current);
       setPosts((prev) => [...prev, ...result.posts]);
       cursorRef.current = result.cursor;
       cursorFeedUserIdsRef.current = feedUserIds; // Update tracked IDs
@@ -112,7 +112,7 @@ export default function FeedScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [user, friendIds, loadingMore, hasMore, getFriendById]);
+  }, [user, friendIds, loadingMore, hasMore, getProfileById]);
 
   useEffect(() => {
     loadPosts();
