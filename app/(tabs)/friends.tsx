@@ -7,7 +7,6 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getErrorMessage } from '@/utils/errors';
 import {
-  getFriends,
   getPendingRequests,
   getBlockedUsers,
   sendFriendRequest,
@@ -20,12 +19,14 @@ import {
   searchUserByUsername,
 } from '@/services/friends';
 import { type FriendWithProfile, type FriendRequest, type User } from '@/types';
+import { useFriends } from '@/contexts/FriendsContext';
 
 type TabType = 'friends' | 'requests' | 'blocked';
 
 export default function FriendsScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { friends, refreshFriends, loading: friendsLoading } = useFriends();
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<TabType>('friends');
@@ -34,7 +35,6 @@ export default function FriendsScreen() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Data
-  const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
@@ -54,13 +54,8 @@ export default function FriendsScreen() {
     if (!user) return;
 
     try {
-      const [friendsList, requests, blocked] = await Promise.all([
-        getFriends(user.uid),
-        getPendingRequests(user.uid),
-        getBlockedUsers(user.uid),
-      ]);
+      const [requests, blocked] = await Promise.all([getPendingRequests(user.uid), getBlockedUsers(user.uid)]);
 
-      setFriends(friendsList);
       setIncomingRequests(requests.incoming);
       setOutgoingRequests(requests.outgoing);
       setBlockedUsers(blocked);
@@ -76,9 +71,13 @@ export default function FriendsScreen() {
     loadData();
   }, [loadData]);
 
+  const refreshData = async () => {
+    await Promise.all([refreshFriends(), loadData()]);
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await refreshData();
     setRefreshing(false);
   };
 
@@ -124,7 +123,7 @@ export default function FriendsScreen() {
       setShowAddFriend(false);
       setUsernameSearch('');
       setSearchResult(null);
-      await loadData();
+      await loadData(); // Only refresh requests, friends will update when accepted
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
     } finally {
@@ -139,7 +138,7 @@ export default function FriendsScreen() {
     setActionLoading(requestId);
     try {
       await acceptFriendRequest(requestId, user.uid);
-      await loadData();
+      await refreshData();
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
     } finally {
@@ -185,7 +184,7 @@ export default function FriendsScreen() {
     try {
       await removeFriend(selectedFriend.friendshipId, user.uid);
       setSelectedFriend(null);
-      await loadData();
+      await refreshData();
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
     } finally {
@@ -201,7 +200,7 @@ export default function FriendsScreen() {
     try {
       await blockUser(user.uid, selectedFriend.user.id);
       setSelectedFriend(null);
-      await loadData();
+      await refreshData();
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
     } finally {
@@ -280,7 +279,7 @@ export default function FriendsScreen() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             ListEmptyComponent={
               <View style={styles.empty}>
-                <Text color="muted">{loading ? 'Loading...' : 'No friends yet'}</Text>
+                <Text color="muted">{loading || friendsLoading ? 'Loading...' : 'No friends yet'}</Text>
               </View>
             }
           />

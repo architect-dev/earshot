@@ -146,6 +146,10 @@
   - [x] Heart button (hidden for own posts)
   - [x] Comment button (hidden for own posts)
   - [x] Timestamp display (relative < 1 week, absolute >= 1 week)
+  - [x] Three dots button for all posts (owner and non-owner)
+  - [x] disableAuthorPress prop to disable author navigation
+  - [x] Three dots button for all posts (owner and non-owner)
+  - [x] disableAuthorPress prop to disable author navigation
 - [x] Build PostInteractionModal component:
   - [x] Quoted content preview (matches DM appearance)
   - [x] Heart mode (preview + send)
@@ -156,12 +160,26 @@
   - [x] Applies crop data (scale, x, y) to position images
   - [x] Swipeable slides
   - [x] Position indicator and dot navigation
-- [ ] Build Post Detail page:
-  - [ ] Dedicated route for viewing a single post (`/post/[id]`)
-  - [ ] Full post display (same as PostCard but standalone)
-  - [ ] Heart and comment buttons
-  - [ ] Navigation from quoted content in messages
-  - [ ] Back navigation
+- [x] Build Post Detail page:
+  - [x] Dedicated route for viewing a single post (`/post/[id]`)
+  - [x] Full post display (same as PostCard but standalone)
+  - [x] Heart and comment buttons
+  - [x] Navigation from quoted content in messages
+  - [x] Back navigation
+  - [x] Header with user avatar and name format: "{User name}'s Post"
+  - [x] Disable author navigation (disableAuthorPress prop)
+  - [x] Three dots button for all posts (owner and non-owner)
+  - [x] Non-owner modal with "Open DM" option
+- [x] Build User Feed page:
+  - [x] Dedicated route for viewing a user's posts (`/user/[id]`)
+  - [x] Full screen page with header showing user avatar and name
+  - [x] Displays all posts by that user with infinite scroll pagination
+  - [x] Heart and comment buttons
+  - [x] Navigation from author name click in feed
+  - [x] Back navigation
+  - [x] Disable author navigation (disableAuthorPress prop)
+  - [x] Three dots button for all posts (owner and non-owner)
+  - [x] Non-owner modal with "Open DM" option
 - [ ] Build MediaViewer (full screen):
   - [ ] Swipeable slides
   - [ ] Pinch-to-zoom
@@ -299,7 +317,7 @@
   - [x] [CANCEL] button to close
 - [ ] Implement inline message reactions:
   - [x] Add 'reaction' as message type
-  - [x] Reaction messages quote target message (quotedContent with empty preview)
+  - [x] Reaction messages quote target message (quotedContent with empty preview)t 
   - [x] Support reaction types (starting with 'heart', extensible for future)
   - [x] Toggle reactions (create reaction message if not present, delete if present)
   - [x] Backend functions: toggleMessageReaction, getMessageReactions, getReactionCount, hasUserReacted
@@ -378,7 +396,81 @@
   - [x] Create new DM if none exists
   - [x] Use QuotedContent component for post preview
 
-### Phase 6: Push Notifications
+### Phase 6: Data Caching & Real-time Subscriptions
+
+**Estimated Effort:** 2-3 sessions
+
+**Goal:** Optimize data fetching by implementing caching and real-time subscriptions to reduce duplicate queries and improve UX.
+
+#### Caching Strategy
+
+- [x] Create FriendsContext:
+  - [x] Fetch all friends (max 150) and their profiles on app load/login
+  - [x] Cache friends list in context/global state
+  - [x] Refresh cache only on friend actions (accept/decline/remove/block)
+  - [x] Update `areFriends()` to use cached data instead of querying (context method available)
+  - [x] Update feed screen to use cached friends list
+  - [x] Update friends screen to use cached friends list
+  - [x] Update messages screen to use cached friends list
+
+- [ ] Create ConversationsCache:
+  - [ ] Fetch all conversations on messages screen load
+  - [ ] For each conversation, fetch first page (50 messages) upfront
+  - [ ] Cache conversations and their initial messages
+  - [ ] Update messages list to use cached last messages (no individual fetches)
+  - [ ] Update conversation screen to use cached initial messages
+
+- [ ] Create UserProfilesCache:
+  - [ ] Cache user profiles globally (deduplicate by userId)
+  - [ ] Batch fetch post authors after getting posts (deduplicate IDs)
+  - [ ] Update feed screen to batch fetch authors instead of per-post
+  - [ ] Update all screens to use cached profiles when available
+
+#### Real-time Subscriptions (Hybrid Approach)
+
+- [ ] Active conversation messages:
+  - [ ] Subscribe to messages query when conversation screen is open
+  - [ ] Unsubscribe when leaving conversation screen
+  - [ ] Handle new messages in real-time
+  - [ ] Merge with cached messages (avoid duplicates)
+
+- [ ] Conversations list:
+  - [ ] Subscribe to conversations query when on messages tab
+  - [ ] Unsubscribe when leaving messages tab
+  - [ ] Update conversations in real-time (new messages, unread counts)
+  - [ ] Update lastMessageAt and unreadCounts automatically
+
+- [ ] Active conversation document:
+  - [ ] Subscribe to conversation document when viewing conversation
+  - [ ] Update unread counts and conversation metadata in real-time
+  - [ ] Unsubscribe when leaving conversation
+
+#### Pull + Cache (No Subscriptions)
+
+- [ ] Friends list: Keep as pull + cache (changes infrequently)
+- [ ] Feed posts: Keep as pull + cache (large dataset, paginated)
+- [ ] User profiles: Pull + cache with TTL (unless actively viewing)
+
+#### Implementation Details
+
+- [ ] Use `subscribeToQuery` for conversations and messages
+- [ ] Use `subscribeToDocument` for active conversation
+- [ ] Implement proper cleanup (unsubscribe on unmount)
+- [ ] Handle subscription errors gracefully
+- [ ] Merge real-time updates with cached data
+- [ ] Prevent duplicate data in lists
+- [ ] Update optimistic UI to work with subscriptions
+
+#### Benefits
+
+- Eliminates duplicate user profile fetches
+- Eliminates individual last message fetches (N queries → 1 query)
+- Real-time updates for active conversations
+- Faster initial load with cached data
+- Reduced Firebase read costs
+- Better UX with instant updates
+
+### Phase 7: Push Notifications
 
 **Estimated Effort:** 1-2 sessions
 
@@ -392,7 +484,7 @@
   - [ ] Group chat mention notification (future)
 - [ ] Handle notification tap (deep linking)
 
-### Phase 7: Analytics & Crash Reporting
+### Phase 8: Analytics & Crash Reporting
 
 **Estimated Effort:** 1 session
 
@@ -407,7 +499,7 @@
 - [ ] Configure Sentry
 - [ ] Test crash reporting
 
-### Phase 8: Online Presence
+### Phase 9: Online Presence
 
 **Estimated Effort:** 1 session
 
@@ -417,7 +509,7 @@
 - [ ] Show "Last seen X ago" for offline friends
 - [ ] Add usePresence hook for heartbeat management
 
-### Phase 9: Security Hardening
+### Phase 10: Security Hardening
 
 **Estimated Effort:** 1-2 sessions
 
@@ -430,7 +522,7 @@
 - [ ] Implement rate limiting (Cloud Functions)
 - [ ] Validate all user inputs server-side
 
-### Phase 10: Voice Messages (Optional)
+### Phase 11: Voice Messages (Optional)
 
 **Estimated Effort:** 1-2 sessions
 
@@ -443,7 +535,7 @@
 - [ ] Voice message playback in message bubbles
 - [ ] Add voice option to InteractionModal
 
-### Phase 11: Polish & Testing
+### Phase 12: Polish & Testing
 
 **Estimated Effort:** 2-3 sessions
 
@@ -458,7 +550,7 @@
 - [ ] Test on physical Android device
 - [ ] Performance optimization (memo, virtualized lists)
 
-### Phase 12: Beta Deployment
+### Phase 13: Beta Deployment
 
 **Estimated Effort:** 1-2 sessions
 
@@ -613,6 +705,9 @@ earshot/
 - [ ] View feed
   - [x] Heart a post (sends to conversation with quoted post)
   - [x] Comment on a post (sends to conversation with quoted post)
+  - [x] Click author name to view user feed
+  - [x] Click quoted post to view post detail
+  - [x] Three dots menu on posts (owner: edit/delete, non-owner: open DM)
   - [x] Send text message
   - [x] Send photo in DM
   - [ ] Send voice message

@@ -10,7 +10,7 @@ import { getUserConversations, findOrCreateDM } from '@/services/conversations';
 import { getLastMessage } from '@/services/messages';
 import { getDocument } from '@/services/firebase/firestore';
 import { COLLECTIONS } from '@/services/firebase/firestore';
-import { getFriends } from '@/services/friends';
+import { useFriends } from '@/contexts/FriendsContext';
 import { type Conversation, type Message, type User } from '@/types';
 import { type FriendWithProfile } from '@/types';
 
@@ -27,6 +27,7 @@ interface ConversationWithData extends Conversation {
 export default function MessagesScreen() {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const { friends, loading: friendsLoading } = useFriends();
   const router = useRouter();
 
   const [conversations, setConversations] = useState<ConversationWithData[]>([]);
@@ -35,9 +36,7 @@ export default function MessagesScreen() {
 
   // New conversation modal
   const [showNewConversation, setShowNewConversation] = useState(false);
-  const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loadingFriends, setLoadingFriends] = useState(false);
   const [creatingDM, setCreatingDM] = useState(false);
 
   const loadConversations = useCallback(async () => {
@@ -88,28 +87,6 @@ export default function MessagesScreen() {
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
-
-  // Load friends when modal opens
-  const loadFriends = useCallback(async () => {
-    if (!user) return;
-
-    setLoadingFriends(true);
-    try {
-      const friendsList = await getFriends(user.uid);
-      setFriends(friendsList);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Error loading friends:', err);
-    } finally {
-      setLoadingFriends(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (showNewConversation) {
-      loadFriends();
-    }
-  }, [showNewConversation, loadFriends]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -218,7 +195,7 @@ export default function MessagesScreen() {
             <Button title="CREATE GROUP" variant="ghost" onPress={handleCreateGroup} />
           </View>
 
-          {loadingFriends ? (
+          {friendsLoading ? (
             <View style={styles.loadingContainer}>
               <Text color="muted">Loading friends...</Text>
             </View>

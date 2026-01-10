@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { FriendsProvider } from '@/contexts/FriendsContext';
 import { DebugProvider, useDebug } from '@/contexts/DebugContext';
 import { LoadingSpinner, ConfirmModal } from '@/components/ui';
 import { DebugMenu, getDefaultDebugItems } from '@/components/debug';
@@ -112,9 +113,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.container}>
       <ThemeProvider>
         <AuthProvider>
-          <DebugProvider>
-            <RootLayoutNav />
-          </DebugProvider>
+          <FriendsProvider>
+            <DebugProvider>
+              <RootLayoutNav />
+            </DebugProvider>
+          </FriendsProvider>
         </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

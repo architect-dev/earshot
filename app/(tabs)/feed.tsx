@@ -7,8 +7,8 @@ import { PostCard, PostInteractionModal, type InteractionType } from '@/componen
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getFeedPosts, deletePost } from '@/services/posts';
-import { getFriends } from '@/services/friends';
 import { findOrCreateDM } from '@/services/conversations';
+import { useFriends } from '@/contexts/FriendsContext';
 import { createMessage } from '@/services/messages';
 import { getErrorMessage } from '@/utils/errors';
 import { type PostWithAuthor, type QuotedContent } from '@/types';
@@ -18,6 +18,7 @@ const PAGE_SIZE = 20;
 export default function FeedScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { friendIds } = useFriends();
   const router = useRouter();
 
   const [posts, setPosts] = useState<PostWithAuthor[]>([]);
@@ -26,9 +27,8 @@ export default function FeedScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  // Store cursor and friend IDs for pagination
+  // Store cursor for pagination
   const cursorRef = useRef<DocumentSnapshot | null>(null);
-  const friendIdsRef = useRef<string[]>([]);
 
   // Post options state
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
@@ -48,13 +48,8 @@ export default function FeedScreen() {
       if (!user) return;
 
       try {
-        // Get friend IDs first (only on initial load or refresh)
-        if (isRefresh || friendIdsRef.current.length === 0) {
-          const friends = await getFriends(user.uid);
-          friendIdsRef.current = friends.map((f) => f.user.id);
-          // Include own posts in feed
-          friendIdsRef.current.push(user.uid);
-        }
+        // Include own posts in feed (friendIds + current user)
+        const feedUserIds = [...friendIds, user.uid];
 
         // Reset cursor on refresh
         if (isRefresh) {
@@ -62,7 +57,7 @@ export default function FeedScreen() {
         }
 
         // Fetch posts
-        const result = await getFeedPosts(friendIdsRef.current, PAGE_SIZE, null);
+        const result = await getFeedPosts(feedUserIds, PAGE_SIZE, cursorRef.current);
         setPosts(result.posts);
         cursorRef.current = result.cursor;
         setHasMore(result.hasMore);
@@ -73,7 +68,7 @@ export default function FeedScreen() {
         setLoading(false);
       }
     },
-    [user]
+    [user, friendIds]
   );
 
   const loadMorePosts = useCallback(async () => {
@@ -81,7 +76,9 @@ export default function FeedScreen() {
 
     setLoadingMore(true);
     try {
-      const result = await getFeedPosts(friendIdsRef.current, PAGE_SIZE, cursorRef.current);
+      // Include own posts in feed (friendIds + current user)
+      const feedUserIds = [...friendIds, user.uid];
+      const result = await getFeedPosts(feedUserIds, PAGE_SIZE, cursorRef.current);
       setPosts((prev) => [...prev, ...result.posts]);
       cursorRef.current = result.cursor;
       setHasMore(result.hasMore);
@@ -91,7 +88,7 @@ export default function FeedScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [user, loadingMore, hasMore]);
+  }, [user, friendIds, loadingMore, hasMore]);
 
   useEffect(() => {
     loadPosts();
