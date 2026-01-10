@@ -1,19 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { type DocumentSnapshot } from 'firebase/firestore';
 import { ScreenContainer, Text, PageHeader, Modal, Button, ConfirmModal, Spacer } from '@/components/ui';
 import { PostCard, PostInteractionModal, type InteractionType } from '@/components/posts';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { getFeedPosts, deletePost } from '@/services/posts';
+import { deletePost } from '@/services/posts';
 import { findOrCreateDM } from '@/services/conversations';
 import { useFriends } from '@/contexts/FriendsContext';
 import { createMessage } from '@/services/messages';
 import { getErrorMessage } from '@/utils/errors';
 import { type PostWithAuthor, type QuotedContent } from '@/types';
-
-const PAGE_SIZE = 20;
+import { useFeedPosts } from '@/hooks/useFeedPosts';
 
 export default function FeedScreen() {
   const { theme } = useTheme();
@@ -21,17 +19,18 @@ export default function FeedScreen() {
   const { friendIds, getProfileById } = useFriends();
   const router = useRouter();
 
-  const [posts, setPosts] = useState<PostWithAuthor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  // Calculate feed user IDs (friends + current user)
+  const feedUserIds = useMemo(() => {
+    if (!user) return [];
+    return [...friendIds, user.uid];
+  }, [user, friendIds]);
 
-  // Store cursor for pagination
-  const cursorRef = useRef<DocumentSnapshot | null>(null);
-  // Track the feedUserIds that were used for the cursor
-  // If feedUserIds changes, the cursor is invalid and must be reset
-  const cursorFeedUserIdsRef = useRef<string[]>([]);
+  // Use the reusable feed hook
+  const { posts, loading, refreshing, loadingMore, refresh, loadMore } = useFeedPosts({
+    userIds: feedUserIds,
+    getProfileById,
+    enabled: !!user,
+  });
 
   // Post options state
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
@@ -45,84 +44,6 @@ export default function FeedScreen() {
   const [interactionType, setInteractionType] = useState<InteractionType>('heart');
   const [showInteractionModal, setShowInteractionModal] = useState(false);
   const [sendingInteraction, setSendingInteraction] = useState(false);
-
-  const loadPosts = useCallback(
-    async (isRefresh = false) => {
-      if (!user) return;
-
-      try {
-        // Include own posts in feed (friendIds + current user)
-        const feedUserIds = [...friendIds, user.uid];
-
-        // Reset cursor if feedUserIds changed (cursor is query-specific)
-        // Compare arrays by sorting and stringifying to check if they're the same
-        const currentIds = [...feedUserIds].sort().join(',');
-        const cursorIds = [...cursorFeedUserIdsRef.current].sort().join(',');
-        if (currentIds !== cursorIds) {
-          cursorRef.current = null;
-          cursorFeedUserIdsRef.current = feedUserIds;
-        }
-
-        // Reset cursor on refresh
-        if (isRefresh) {
-          cursorRef.current = null;
-        }
-
-        // Fetch posts
-        const result = await getFeedPosts(feedUserIds, getProfileById, PAGE_SIZE, cursorRef.current);
-        setPosts(result.posts);
-        cursorRef.current = result.cursor;
-        cursorFeedUserIdsRef.current = feedUserIds; // Update tracked IDs
-        setHasMore(result.hasMore);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('Error loading feed:', err);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [user, friendIds, getProfileById]
-  );
-
-  const loadMorePosts = useCallback(async () => {
-    if (!user || loadingMore || !hasMore || !cursorRef.current) return;
-
-    setLoadingMore(true);
-    try {
-      // Include own posts in feed (friendIds + current user)
-      const feedUserIds = [...friendIds, user.uid];
-
-      // Verify cursor is still valid for current feedUserIds
-      const currentIds = [...feedUserIds].sort().join(',');
-      const cursorIds = [...cursorFeedUserIdsRef.current].sort().join(',');
-      if (currentIds !== cursorIds) {
-        // Feed user IDs changed, can't use old cursor
-        setLoadingMore(false);
-        return;
-      }
-
-      const result = await getFeedPosts(feedUserIds, getProfileById, PAGE_SIZE, cursorRef.current);
-      setPosts((prev) => [...prev, ...result.posts]);
-      cursorRef.current = result.cursor;
-      cursorFeedUserIdsRef.current = feedUserIds; // Update tracked IDs
-      setHasMore(result.hasMore);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Error loading more posts:', err);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [user, friendIds, loadingMore, hasMore, getProfileById]);
-
-  useEffect(() => {
-    loadPosts();
-  }, [loadPosts]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadPosts(true);
-    setRefreshing(false);
-  };
 
   const handleHeartPress = (post: PostWithAuthor) => {
     setInteractionPost(post);
@@ -226,8 +147,8 @@ export default function FeedScreen() {
     setActionLoading(true);
     try {
       await deletePost(selectedPost.id, user.uid);
-      // Remove from local state
-      setPosts((prev) => prev.filter((p) => p.id !== selectedPost.id));
+      // Refresh feed to remove deleted post
+      await refresh();
       setShowDeleteConfirm(false);
       setSelectedPost(null);
     } catch (err) {
@@ -297,14 +218,14 @@ export default function FeedScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={onRefresh}
+              onRefresh={refresh}
               tintColor={theme.colors.gold}
               colors={[theme.colors.gold]}
             />
           }
           ListEmptyComponent={renderEmpty}
           ListFooterComponent={renderFooter}
-          onEndReached={loadMorePosts}
+          onEndReached={loadMore}
           onEndReachedThreshold={0.5}
           showsVerticalScrollIndicator={false}
         />

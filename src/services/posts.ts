@@ -320,27 +320,25 @@ export interface PaginatedFeedResult {
  * Uses FriendsContext for author data (all users are friends)
  */
 export async function getFeedPosts(
-  friendIds: string[],
+  userIds: string[],
   getProfileById: GetProfileByIdFn,
   pageSize = 20,
   cursor?: DocumentSnapshot | null
 ): Promise<PaginatedFeedResult> {
-  if (friendIds.length === 0) {
+  if (userIds.length === 0) {
     return { posts: [], cursor: null, hasMore: false };
   }
 
   // Firestore 'in' queries are limited to 30 items
   // For users with more friends, we'd need to batch queries
-  const queryFriendIds = friendIds.slice(0, 30);
+  const queryUserIds = userIds.slice(0, 30);
 
   const result = await queryDocumentsPaginated<Post>(
     COLLECTIONS.POSTS,
-    [where('authorId', 'in', queryFriendIds), orderBy('createdAt', 'desc')],
+    [where('authorId', 'in', queryUserIds), orderBy('createdAt', 'desc')],
     pageSize,
     cursor
   );
-
-  console.log({ queryFriendIds, cursor, result });
 
   // Enrich posts with author info from FriendsContext (no Firestore fetch needed)
   const postsWithAuthors: PostWithAuthor[] = [];

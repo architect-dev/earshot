@@ -1,22 +1,19 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { View, FlatList, StyleSheet, Alert, ActivityIndicator, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6 } from '@expo/vector-icons';
-import { type DocumentSnapshot } from 'firebase/firestore';
 import { ScreenContainer, Text, Avatar, Modal, Button } from '@/components/ui';
 import { PostCard } from '@/components/posts';
 import { PostInteractionModal } from '@/components/posts/PostInteractionModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriends } from '@/contexts/FriendsContext';
-import { getUserPosts } from '@/services/posts';
 import { findOrCreateDM } from '@/services/conversations';
 import { createMessage as createMessageService } from '@/services/messages';
 import { getErrorMessage } from '@/utils/errors';
 import { type PostWithAuthor, type QuotedContent } from '@/types';
-
-const PAGE_SIZE = 20;
+import { useFeedPosts } from '@/hooks/useFeedPosts';
 
 export default function UserFeedScreen() {
   const { theme } = useTheme();
@@ -26,67 +23,22 @@ export default function UserFeedScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const [posts, setPosts] = useState<PostWithAuthor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const cursorRef = useRef<DocumentSnapshot | null>(null);
+  const userIds = useMemo(() => (id ? [id] : []), [id]);
+  const profile = useMemo(() => (id ? getProfileById(id) : undefined), [id, getProfileById]);
+
+  // Use the reusable feed hook
+  const { posts, loading, loadingMore, loadMore } = useFeedPosts({
+    userIds,
+    getProfileById,
+    enabled: !!id,
+  });
+
   const [showInteractionModal, setShowInteractionModal] = useState(false);
   const [interactionPost, setInteractionPost] = useState<PostWithAuthor | null>(null);
   const [interactionType, setInteractionType] = useState<'heart' | 'comment'>('heart');
   const [sendingInteraction, setSendingInteraction] = useState(false);
   const [showNonOwnerModal, setShowNonOwnerModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
-
-  // Get user profile from FriendsContext
-  const profile = useMemo(() => (id ? getProfileById(id) : undefined), [id, getProfileById]);
-
-  const loadUserAndPosts = useCallback(async () => {
-    if (!id) return;
-
-    if (!profile) {
-      Alert.alert('Error', 'User not found');
-      router.back();
-      return;
-    }
-
-    try {
-      // Load initial posts
-      const result = await getUserPosts(id, PAGE_SIZE);
-      setPosts(result.posts.map((p) => ({ ...p, author: profile })));
-      cursorRef.current = result.cursor;
-      setHasMore(result.hasMore);
-    } catch (err) {
-      Alert.alert('Error', getErrorMessage(err));
-      router.back();
-    } finally {
-      setLoading(false);
-    }
-  }, [id, router, profile]);
-
-  useEffect(() => {
-    loadUserAndPosts();
-  }, [loadUserAndPosts]);
-
-  const loadMorePosts = useCallback(async () => {
-    if (!id || loadingMore || !hasMore || !cursorRef.current) return;
-
-    if (!profile) return;
-
-    setLoadingMore(true);
-    try {
-      const result = await getUserPosts(id, PAGE_SIZE, cursorRef.current);
-      const postsWithAuthor = result.posts.map((p) => ({ ...p, author: profile }));
-      setPosts((prev) => [...prev, ...postsWithAuthor]);
-      cursorRef.current = result.cursor;
-      setHasMore(result.hasMore);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Error loading more posts:', err);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [id, loadingMore, hasMore, profile]);
 
   const handleHeartPress = (post: PostWithAuthor) => {
     setInteractionPost(post);
@@ -235,7 +187,7 @@ export default function UserFeedScreen() {
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={renderPost}
-        onEndReached={loadMorePosts}
+        onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
         ListEmptyComponent={
