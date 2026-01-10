@@ -217,12 +217,17 @@
 
 #### Core Messaging Features (DM-first implementation)
 
-- [ ] Build Messages tab:
-  - [ ] Unified conversations list (DMs and groups)
-  - [ ] Unread indicator (per conversation)
-  - [ ] Last message preview
-  - [ ] Timestamp display
-  - [ ] Conversation type indicator (optional)
+- [x] Build Messages tab:
+  - [x] Unified conversations list (DMs and groups)
+  - [x] Unread indicator (per conversation)
+  - [x] Last message preview
+  - [x] Timestamp display
+  - [x] Conversation type indicator (optional)
+  - [x] [NEW] button to create new conversations
+  - [x] Modal for searching friends to create DMs
+  - [x] Fuzzy search for friends in new conversation modal
+  - [x] Find or create DM functionality
+  - [x] "CREATE GROUP" button (placeholder alert)
 - [ ] Build Conversation screen (works for both DMs and groups):
   - [ ] Message list (reverse chronological, infinite scroll - see details below)
   - [ ] Text input

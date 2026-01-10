@@ -3,8 +3,8 @@ import { Text as RNText, type TextProps as RNTextProps, StyleSheet } from 'react
 import { useTheme } from '@/contexts/ThemeContext';
 import { fontSize as fontSizes, fontWeight as fontWeights } from '@/theme';
 
-type FontSize = keyof typeof fontSizes;
-type FontWeight = keyof typeof fontWeights;
+export type FontSize = keyof typeof fontSizes;
+export type FontWeight = keyof typeof fontWeights;
 
 interface TextProps extends RNTextProps {
   size?: FontSize;

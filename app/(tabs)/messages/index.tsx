@@ -153,8 +153,7 @@ export default function MessagesScreen() {
       // Reload conversations to get the new one
       await loadConversations();
       // Navigate to the conversation
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      router.push(`/messages/${conversation.id}` as any);
+      router.push(`/messages/${conversation.id}`);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Error creating/finding DM:', err);

@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Image, StyleSheet, type ViewStyle } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Text } from './Text';
+import { Text, FontSize } from './Text';
 
-type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
+type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 interface AvatarProps {
   source?: string | null;
@@ -13,13 +13,15 @@ interface AvatarProps {
 }
 
 const sizeMap: Record<AvatarSize, number> = {
+  xs: 24,
   sm: 32,
   md: 48,
   lg: 64,
   xl: 96,
 };
 
-const fontSizeMap: Record<AvatarSize, 'xs' | 'sm' | 'md' | 'lg'> = {
+const fontSizeMap: Record<AvatarSize, FontSize> = {
+  xs: 'xs',
   sm: 'xs',
   md: 'sm',
   lg: 'md',

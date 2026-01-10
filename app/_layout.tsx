@@ -82,7 +82,14 @@ function RootLayoutNav() {
           contentStyle: { backgroundColor: theme.colors.base },
           animation: 'fade',
         }}
-      />
+      >
+        <Stack.Screen
+          name="messages/[id]"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+      </Stack>
       <GlobalDebugMenu />
     </>
   );
