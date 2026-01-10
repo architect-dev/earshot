@@ -261,6 +261,7 @@
   - [x] Message bubbles (sent/received styling)
   - [x] Pending messages (50% opacity until confirmed sent)
   - [x] Read receipts (delivered/read)
+  - [ ] "Beginning of your conversation with {User}" component before first message
   - [ ] Timestamp display improvements:
     - [ ] Instagram-style swipe left to reveal timestamp (hide timestamp by default, show on swipe)
     - [ ] Insert time breaks between messages:
@@ -413,47 +414,40 @@
   - [x] Update friends screen to use cached friends list
   - [x] Update messages screen to use cached friends list
 
-- [ ] Create ConversationsCache:
-  - [ ] Fetch all conversations on messages screen load
-  - [ ] For each conversation, fetch first page (50 messages) upfront
-  - [ ] Cache conversations and their initial messages
-  - [ ] Update messages list to use cached last messages (no individual fetches)
-  - [ ] Update conversation screen to use cached initial messages
+- [x] Create ConversationsCache:
+  - [x] Fetch all conversations on messages screen load
+  - [x] For each conversation, fetch first page (50 messages) upfront
+  - [x] Cache conversations and their initial messages
+  - [x] Update messages list to use cached last messages (no individual fetches)
+  - [x] Update conversation screen to use cached initial messages
 
 #### Real-time Subscriptions (Hybrid Approach)
 
-- [ ] Active conversation messages:
-  - [ ] Subscribe to messages query when conversation screen is open
-  - [ ] Unsubscribe when leaving conversation screen
-  - [ ] Handle new messages in real-time
-  - [ ] Merge with cached messages (avoid duplicates)
+- [x] Active conversation messages:
+  - [x] Subscribe to messages query when conversation screen is open
+  - [x] Unsubscribe when leaving conversation screen
+  - [x] Handle new messages in real-time
+  - [x] Merge with cached messages (avoid duplicates)
 
-- [ ] Conversations list:
-  - [ ] Subscribe to conversations query when on messages tab
-  - [ ] Unsubscribe when leaving messages tab
-  - [ ] Update conversations in real-time (new messages, unread counts)
-  - [ ] Update lastMessageAt and unreadCounts automatically
-
-- [ ] Active conversation document:
-  - [ ] Subscribe to conversation document when viewing conversation
-  - [ ] Update unread counts and conversation metadata in real-time
-  - [ ] Unsubscribe when leaving conversation
+- [x] Conversations list:
+  - [x] Subscribe to conversations query when on messages tab
+  - [x] Unsubscribe when leaving messages tab
+  - [x] Update conversations in real-time (new messages, unread counts)
+  - [x] Update lastMessageAt and unreadCounts automatically
 
 #### Pull + Cache (No Subscriptions)
 
-- [ ] Friends list: Keep as pull + cache (changes infrequently) - ✅ Already implemented via FriendsContext
+- [x] Friends list: Keep as pull + cache (changes infrequently)
 - [ ] Feed posts: Keep as pull + cache (large dataset, paginated)
-- [ ] User profiles: Covered by FriendsContext (all profiles needed are friends' profiles)
 
 #### Implementation Details
 
-- [ ] Use `subscribeToQuery` for conversations and messages
-- [ ] Use `subscribeToDocument` for active conversation
-- [ ] Implement proper cleanup (unsubscribe on unmount)
-- [ ] Handle subscription errors gracefully
-- [ ] Merge real-time updates with cached data
-- [ ] Prevent duplicate data in lists
-- [ ] Update optimistic UI to work with subscriptions
+- [x] Use `subscribeToQuery` for conversations and messages
+- [x] Implement proper cleanup (unsubscribe on unmount)
+- [x] Handle subscription errors gracefully
+- [x] Merge real-time updates with cached data
+- [x] Prevent duplicate data in lists
+- [x] Update optimistic UI to work with subscriptions
 
 ### Phase 7: Push Notifications
 

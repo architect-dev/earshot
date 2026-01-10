@@ -3,18 +3,17 @@ import { View, FlatList, StyleSheet, Alert, ActivityIndicator, Pressable } from 
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6 } from '@expo/vector-icons';
-import { type DocumentSnapshot } from 'firebase/firestore';
 import { ScreenContainer, Text, Avatar } from '@/components/ui';
 import { MessageBubble, MessageInput, MessageContextModal } from '@/components/messages';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { getConversation } from '@/services/conversations';
-import { getConversationMessages, createMessage, markMessagesAsRead } from '@/services/messages';
+import { useConversations, useConversation } from '@/contexts/ConversationsContext';
+import { createMessage, markMessagesAsRead } from '@/services/messages';
 import { getDocument } from '@/services/firebase/firestore';
 import { COLLECTIONS } from '@/services/firebase/firestore';
 import { uploadFile, getMessageMediaPath } from '@/services/firebase/storage';
 import { getErrorMessage } from '@/utils/errors';
-import { type Conversation, type Message, type User, type QuotedContent } from '@/types';
+import { type Message, type User, type QuotedContent } from '@/types';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 interface PendingMessage {
@@ -63,64 +62,66 @@ async function processMessageImage(uri: string): Promise<Blob> {
 export default function ConversationScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { setActiveConversationId } = useConversations();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id: conversationId } = useLocalSearchParams<{ id: string }>();
 
-  const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Use the hook to get conversation and messages
+  const { conversation, messages, hasMore, loading, loadMoreMessages: loadMore } = useConversation(conversationId);
+
+  // UI-specific state
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
   const [sending, setSending] = useState(false);
   const [quotedContent, setQuotedContent] = useState<QuotedContent | null>(null);
   const [contextModalVisible, setContextModalVisible] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
-  // Store cursor and user profiles for pagination and display
-  const cursorRef = useRef<DocumentSnapshot | null>(null);
+  // Store user profiles for display
   const userProfilesRef = useRef<Map<string, User>>(new Map());
   const [userProfiles, setUserProfiles] = useState<Map<string, User>>(new Map());
   const flatListRef = useRef<FlatList>(null);
 
-  // Load conversation and initial messages
-  const loadConversation = useCallback(async () => {
-    if (!conversationId || !user) return;
+  // Set active conversation when screen opens
+  useEffect(() => {
+    if (conversationId) {
+      setActiveConversationId(conversationId);
+    }
+    return () => {
+      setActiveConversationId(null);
+    };
+  }, [conversationId, setActiveConversationId]);
 
-    try {
-      const [conv, initialMessages] = await Promise.all([
-        getConversation(conversationId),
-        getConversationMessages(conversationId),
-      ]);
+  // Handle conversation not found
+  useEffect(() => {
+    if (conversationId && !loading && !conversation) {
+      Alert.alert('Error', 'Conversation not found');
+      router.back();
+    }
+  }, [conversationId, loading, conversation, router]);
 
-      if (!conv) {
-        Alert.alert('Error', 'Conversation not found');
-        router.back();
-        return;
-      }
+  // Mark messages as read when conversation loads
+  useEffect(() => {
+    if (!conversationId || !user || !conversation || messages.length === 0) return;
 
-      setConversation(conv);
-      setMessages(initialMessages.messages);
-      cursorRef.current = initialMessages.lastDoc;
-      setHasMore(initialMessages.hasMore);
+    const unreadMessageIds = messages.filter((msg) => !msg.readBy.includes(user.uid)).map((msg) => msg.id);
+    if (unreadMessageIds.length > 0) {
+      // Don't await - mark as read in background
+      markMessagesAsRead(conversationId, user.uid, unreadMessageIds).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Error marking messages as read:', err);
+      });
+    }
+  }, [conversationId, user, conversation, messages]);
 
-      // Mark all unread messages as read
-      const unreadMessageIds = initialMessages.messages
-        .filter((msg) => !msg.readBy.includes(user.uid))
-        .map((msg) => msg.id);
-      if (unreadMessageIds.length > 0) {
-        // Don't await - mark as read in background
-        markMessagesAsRead(conversationId, user.uid, unreadMessageIds).catch((err) => {
-          // eslint-disable-next-line no-console
-          console.error('Error marking messages as read:', err);
-        });
-      }
+  // Load user profiles for participants
+  useEffect(() => {
+    if (!conversation) return;
 
-      // Load user profiles for participants (including current user for consistency)
+    const loadProfiles = async () => {
       const profiles = new Map<string, User>();
-      for (const participantId of conv.participants) {
+      for (const participantId of conversation.participants) {
         const profile = await getDocument<User>(COLLECTIONS.USERS, participantId);
         if (profile) {
           profiles.set(participantId, profile);
@@ -128,35 +129,22 @@ export default function ConversationScreen() {
       }
       userProfilesRef.current = profiles;
       setUserProfiles(new Map(profiles));
-    } catch (err) {
-      Alert.alert('Error', getErrorMessage(err));
-      router.back();
-    } finally {
-      setLoading(false);
-    }
-  }, [conversationId, user, router]);
+    };
 
-  useEffect(() => {
-    loadConversation();
-  }, [loadConversation]);
+    loadProfiles();
+  }, [conversation]);
 
   // Load more messages (infinite scroll)
-  const loadMoreMessages = useCallback(async () => {
-    if (!conversationId || loadingMore || !hasMore || !cursorRef.current) return;
+  const handleLoadMore = useCallback(async () => {
+    if (!hasMore || !loadMore) return;
 
-    setLoadingMore(true);
     try {
-      const result = await getConversationMessages(conversationId, cursorRef.current);
-      setMessages((prev) => [...prev, ...result.messages]);
-      cursorRef.current = result.lastDoc;
-      setHasMore(result.hasMore);
+      await loadMore();
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Error loading more messages:', err);
-    } finally {
-      setLoadingMore(false);
     }
-  }, [conversationId, loadingMore, hasMore]);
+  }, [hasMore, loadMore]);
 
   // Send message
   const handleSend = useCallback(
@@ -192,8 +180,8 @@ export default function ConversationScreen() {
           mediaUrl = await uploadFile(storagePath, blob, { contentType: 'image/jpeg' });
         }
 
-        // Create message
-        const message = await createMessage({
+        // Create message (will arrive via real-time subscription)
+        await createMessage({
           conversationId,
           senderId: user.uid,
           type: mediaUri ? 'photo' : 'text',
@@ -204,9 +192,6 @@ export default function ConversationScreen() {
 
         // Remove pending message (real message will arrive via listener)
         setPendingMessages((prev) => prev.filter((p) => p.tempId !== tempId));
-
-        // Add message to list immediately (optimistic update)
-        setMessages((prev) => [message, ...prev]);
       } catch (err) {
         // Mark as failed
         setPendingMessages((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, status: 'failed' as const } : p)));
@@ -317,9 +302,8 @@ export default function ConversationScreen() {
   );
 
   const handleMessageDelete = useCallback(() => {
-    // Refresh messages list to show deleted state
-    loadConversation();
-  }, [loadConversation]);
+    // Messages will update automatically via real-time subscription
+  }, []);
 
   // Handle quoted message press - scroll to message and highlight
   const handleQuotedMessagePress = useCallback(
@@ -434,10 +418,10 @@ export default function ConversationScreen() {
           );
         }}
         inverted // Reverse chronological (newest at bottom)
-        onEndReached={loadMoreMessages}
+        onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={
-          loadingMore ? (
+          loading ? (
             <View style={styles.loadingMore}>
               <ActivityIndicator size="small" color={theme.colors.pine} />
             </View>

@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, ReactNode } from 'react';
+import { type DocumentSnapshot, type Timestamp } from 'firebase/firestore';
 import { getUserConversations } from '@/services/conversations';
-import { subscribeToQuery, COLLECTIONS, where, orderBy } from '@/services/firebase/firestore';
-import { type Conversation } from '@/types';
+import { getConversationMessages } from '@/services/messages';
+import { subscribeToQuery, COLLECTIONS, where, orderBy, limit } from '@/services/firebase/firestore';
+import { type Conversation, type Message } from '@/types';
 import { GetProfileByIdFn, type Profile } from '@/types/profile';
 import { useAuth } from './AuthContext';
 import { useFriends } from './FriendsContext';
@@ -9,6 +11,14 @@ import { useFriends } from './FriendsContext';
 // Enriched conversation with participant profile data
 export interface EnrichedConversation extends Conversation {
   participantProfiles: Profile[];
+}
+
+// Messages for a conversation
+export interface ConversationMessages {
+  messages: Message[];
+  cursor: DocumentSnapshot | null;
+  hasMore: boolean;
+  lastFetchedAt: Timestamp;
 }
 
 // Helper function to enrich a conversation with friend data
@@ -35,6 +45,10 @@ interface ConversationsContextValue {
   getConversationById: (conversationId: string) => EnrichedConversation | undefined;
   activeConversationId: string | null;
   setActiveConversationId: (id: string | null) => void;
+  // Message methods
+  getMessages: (conversationId: string) => ConversationMessages | undefined;
+  loadMoreMessages: (conversationId: string) => Promise<void>;
+  messagesLoading: Map<string, boolean>;
 }
 
 const ConversationsContext = createContext<ConversationsContextValue | undefined>(undefined);
@@ -50,15 +64,75 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Map<string, ConversationMessages>>(new Map());
+  const [messagesLoading, setMessagesLoading] = useState<Map<string, boolean>>(new Map());
 
   // Track subscriptions for cleanup
   const conversationsUnsubscribeRef = useRef<(() => void) | null>(null);
+  const messagesUnsubscribeRefs = useRef<Map<string, () => void>>(new Map());
   const activeConversationIdRef = useRef<string | null>(null);
 
   // Keep ref in sync with state
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
   }, [activeConversationId]);
+
+  // Pre-fetch messages for all conversations
+  const preFetchMessages = useCallback(async (conversationIds: string[]) => {
+    if (conversationIds.length === 0) return;
+
+    // Set loading for all conversations
+    setMessagesLoading((prev) => {
+      const newMap = new Map(prev);
+      conversationIds.forEach((id) => newMap.set(id, true));
+      return newMap;
+    });
+
+    try {
+      // Load messages for all conversations in parallel
+      const messagePromises = conversationIds.map(async (conversationId) => {
+        try {
+          const result = await getConversationMessages(conversationId, null);
+          return {
+            conversationId,
+            messagesData: {
+              messages: result.messages,
+              cursor: result.lastDoc,
+              hasMore: result.hasMore,
+              lastFetchedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as Timestamp,
+            },
+          };
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error(`Error pre-fetching messages for conversation ${conversationId}:`, err);
+          return null;
+        }
+      });
+
+      const results = await Promise.all(messagePromises);
+
+      // Update messages with all fetched data
+      setMessages((prev) => {
+        const newMap = new Map(prev);
+        results.forEach((result) => {
+          if (result) {
+            newMap.set(result.conversationId, result.messagesData);
+          }
+        });
+        return newMap;
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error pre-fetching messages:', err);
+    } finally {
+      // Clear loading for all conversations
+      setMessagesLoading((prev) => {
+        const newMap = new Map(prev);
+        conversationIds.forEach((id) => newMap.set(id, false));
+        return newMap;
+      });
+    }
+  }, []);
 
   const loadConversations = useCallback(async () => {
     if (!user || friendsLoading) {
@@ -77,6 +151,13 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
       const enriched = userConversations.map((conv) => enrichConversation(conv, getProfileById));
 
       setConversations(enriched);
+
+      // Pre-fetch messages for all conversations (don't await - load in background)
+      const conversationIds = enriched.map((conv) => conv.id);
+      preFetchMessages(conversationIds).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Error pre-fetching messages:', err);
+      });
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load conversations'));
       // eslint-disable-next-line no-console
@@ -84,7 +165,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
     } finally {
       setLoading(false);
     }
-  }, [user, getProfileById, friendsLoading]);
+  }, [user, getProfileById, friendsLoading, preFetchMessages]);
 
   // Load conversations when user changes
   useEffect(() => {
@@ -146,7 +227,116 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
         conversationsUnsubscribeRef.current = null;
       }
     };
-  }, [user, getProfileById]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Memoize conversation IDs - only changes when IDs actually change (not when conversation data updates)
+  // Create a stable sorted array that only changes when the actual IDs change
+  const conversationIdsKey = useMemo(() => {
+    return conversations
+      .map((c) => c.id)
+      .sort()
+      .join(',');
+  }, [conversations]);
+
+  const conversationIds = useMemo(() => {
+    const ids = conversations.map((c) => c.id);
+    return [...ids].sort(); // Sort for stable comparison
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationIdsKey]); // Only re-compute when the key (IDs) changes, not when conversation data changes
+
+  // Subscribe to real-time message updates for all conversations
+  useEffect(() => {
+    if (!user || conversationIds.length === 0) {
+      return;
+    }
+
+    // Capture ref at start of effect
+    const currentRef = messagesUnsubscribeRefs.current;
+
+    const isInitialSnapshot = new Map<string, boolean>();
+    const subscriptionsCreated = new Map<string, () => void>();
+
+    conversationIds.forEach((conversationId) => {
+      // Only subscribe if we don't already have a subscription
+      if (!currentRef.has(conversationId)) {
+        isInitialSnapshot.set(conversationId, true);
+
+        try {
+          const unsubscribe = subscribeToQuery<Message>(
+            COLLECTIONS.MESSAGES,
+            [
+              where('conversationId', '==', conversationId),
+              orderBy('createdAt', 'desc'),
+              limit(1), // Only get the latest message
+            ],
+            (messages) => {
+              const isInitial = isInitialSnapshot.get(conversationId);
+              if (isInitial) {
+                // First snapshot - ignore, we already have messages from pre-fetch
+                isInitialSnapshot.set(conversationId, false);
+                return;
+              }
+
+              if (messages.length === 0) {
+                return;
+              }
+
+              // We only get the latest message (limit 1), so messages[0] is the newest
+              const latestMessage = messages[0];
+
+              // Update messages with the new message
+              setMessages((prev) => {
+                const existing = prev.get(conversationId);
+                if (!existing) {
+                  return prev; // Messages not initialized yet
+                }
+
+                // Check if this message is already in our messages
+                const messageExists = existing.messages.some((msg) => msg.id === latestMessage.id);
+                if (messageExists) {
+                  return prev;
+                }
+
+                // Add new message to the beginning (most recent first)
+                const newMap = new Map(prev);
+                newMap.set(conversationId, {
+                  ...existing,
+                  messages: [latestMessage, ...existing.messages],
+                  lastFetchedAt: latestMessage.createdAt,
+                });
+
+                return newMap;
+              });
+            }
+          );
+
+          currentRef.set(conversationId, unsubscribe);
+          subscriptionsCreated.set(conversationId, unsubscribe);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('[Messages Subscription] Error creating subscription for:', conversationId, err);
+        }
+      }
+    });
+
+    // Cleanup: unsubscribe from conversations that no longer exist
+    currentRef.forEach((unsubscribe, conversationId) => {
+      if (!conversationIds.includes(conversationId)) {
+        unsubscribe();
+        currentRef.delete(conversationId);
+      }
+    });
+
+    return () => {
+      // Cleanup subscriptions created in this effect
+      subscriptionsCreated.forEach((unsubscribe, conversationId) => {
+        unsubscribe();
+        // Remove from ref as well (using captured ref)
+        currentRef.delete(conversationId);
+      });
+    };
+  }, [user, conversationIds]);
 
   // Get conversation by ID
   const getConversationById = useCallback(
@@ -154,6 +344,55 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
       return conversations.find((c) => c.id === conversationId);
     },
     [conversations]
+  );
+
+  // Get messages for a conversation
+  const getMessages = useCallback(
+    (conversationId: string): ConversationMessages | undefined => {
+      return messages.get(conversationId);
+    },
+    [messages]
+  );
+
+  // Load more messages for a conversation (pagination)
+  const loadMoreMessages = useCallback(
+    async (conversationId: string) => {
+      const existing = messages.get(conversationId);
+      if (!existing || !existing.cursor || !existing.hasMore) return;
+
+      setMessagesLoading((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(conversationId, true);
+        return newMap;
+      });
+
+      try {
+        const result = await getConversationMessages(conversationId, existing.cursor);
+        setMessages((prev) => {
+          const newMap = new Map(prev);
+          const existingData = newMap.get(conversationId);
+          if (existingData) {
+            newMap.set(conversationId, {
+              messages: [...existingData.messages, ...result.messages],
+              cursor: result.lastDoc,
+              hasMore: result.hasMore,
+              lastFetchedAt: existingData.lastFetchedAt,
+            });
+          }
+          return newMap;
+        });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(`Error loading more messages for conversation ${conversationId}:`, err);
+      } finally {
+        setMessagesLoading((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(conversationId, false);
+          return newMap;
+        });
+      }
+    },
+    [messages]
   );
 
   // Loading is true if conversations are loading OR friends are loading
@@ -167,6 +406,9 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
     getConversationById,
     activeConversationId,
     setActiveConversationId,
+    getMessages,
+    loadMoreMessages,
+    messagesLoading,
   };
 
   return <ConversationsContext.Provider value={value}>{children}</ConversationsContext.Provider>;
@@ -178,4 +420,22 @@ export function useConversations(): ConversationsContextValue {
     throw new Error('useConversations must be used within a ConversationsProvider');
   }
   return context;
+}
+
+// Hook to get conversation and messages for a specific conversation ID
+export function useConversation(conversationId: string | null | undefined) {
+  const { getConversationById, getMessages, messagesLoading, loadMoreMessages } = useConversations();
+
+  const conversation = conversationId ? getConversationById(conversationId) : undefined;
+  const messagesData = conversationId ? getMessages(conversationId) : undefined;
+  const loading = conversationId ? (messagesLoading.get(conversationId) ?? false) : false;
+
+  return {
+    conversation,
+    messages: messagesData?.messages ?? [],
+    cursor: messagesData?.cursor ?? null,
+    hasMore: messagesData?.hasMore ?? false,
+    loading,
+    loadMoreMessages: conversationId ? () => loadMoreMessages(conversationId) : undefined,
+  };
 }
