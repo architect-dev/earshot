@@ -5,14 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { ScreenContainer, Text, Avatar, Modal, Button } from '@/components/ui';
 import { PostCard } from '@/components/posts';
-import { PostInteractionModal } from '@/components/posts/PostInteractionModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriends } from '@/contexts/FriendsContext';
 import { findOrCreateDM } from '@/services/conversations';
-import { createMessage as createMessageService } from '@/services/messages';
 import { getErrorMessage } from '@/utils/errors';
-import { type PostWithAuthor, type QuotedContent } from '@/types';
+import { type PostWithAuthor } from '@/types';
 import { useFeedPosts } from '@/hooks/useFeedPosts';
 
 export default function UserFeedScreen() {
@@ -33,66 +31,8 @@ export default function UserFeedScreen() {
     enabled: !!id,
   });
 
-  const [showInteractionModal, setShowInteractionModal] = useState(false);
-  const [interactionPost, setInteractionPost] = useState<PostWithAuthor | null>(null);
-  const [interactionType, setInteractionType] = useState<'heart' | 'comment'>('heart');
-  const [sendingInteraction, setSendingInteraction] = useState(false);
   const [showNonOwnerModal, setShowNonOwnerModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
-
-  const handleHeartPress = (post: PostWithAuthor) => {
-    setInteractionPost(post);
-    setInteractionType('heart');
-    setShowInteractionModal(true);
-  };
-
-  const handleCommentPress = (post: PostWithAuthor) => {
-    setInteractionPost(post);
-    setInteractionType('comment');
-    setShowInteractionModal(true);
-  };
-
-  const handleSendInteraction = async (
-    conversationId: string,
-    messageType: 'heart' | 'comment',
-    content: string | undefined,
-    heartCount?: number
-  ) => {
-    if (!interactionPost || !user) return;
-
-    setSendingInteraction(true);
-    try {
-      // Create quoted content for the post
-      const quotedContent: QuotedContent = {
-        type: 'post',
-        postId: interactionPost.id,
-        preview: {
-          authorName: interactionPost.author.fullName,
-          authorUsername: interactionPost.author.username,
-          text: interactionPost.textBody || undefined,
-          mediaUrl: interactionPost.media.length > 0 ? interactionPost.media[0].url : undefined,
-        },
-      };
-
-      // Send message with quoted post
-      await createMessageService({
-        conversationId,
-        senderId: user.uid,
-        type: messageType === 'heart' ? 'heart' : 'comment',
-        content: messageType === 'heart' ? undefined : content,
-        quotedContent,
-        heartCount: messageType === 'heart' ? heartCount || 1 : undefined,
-      });
-
-      setShowInteractionModal(false);
-      setInteractionPost(null);
-    } catch (err) {
-      Alert.alert('Error', getErrorMessage(err));
-      throw err;
-    } finally {
-      setSendingInteraction(false);
-    }
-  };
 
   const handleMediaPress = (post: PostWithAuthor, index: number) => {
     // TODO: Open MediaViewer
@@ -125,8 +65,6 @@ export default function UserFeedScreen() {
   const renderPost = ({ item }: { item: PostWithAuthor }) => (
     <PostCard
       post={item}
-      onHeartPress={() => handleHeartPress(item)}
-      onCommentPress={() => handleCommentPress(item)}
       onMediaPress={(index) => handleMediaPress(item, index)}
       onOptionsPress={() => handleOptionsPress(item)}
       isOwner={item.authorId === user?.uid}
@@ -198,21 +136,6 @@ export default function UserFeedScreen() {
           </View>
         }
       />
-
-      {/* Interaction Modal */}
-      {interactionPost && (
-        <PostInteractionModal
-          visible={showInteractionModal}
-          onClose={() => {
-            setShowInteractionModal(false);
-            setInteractionPost(null);
-          }}
-          onSend={handleSendInteraction}
-          post={interactionPost}
-          type={interactionType}
-          loading={sendingInteraction}
-        />
-      )}
 
       {/* Post Options Modal (Non-Owner) */}
       <Modal

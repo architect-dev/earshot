@@ -7,6 +7,7 @@ import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { FriendsProvider } from '@/contexts/FriendsContext';
 import { ConversationsProvider } from '@/contexts/ConversationsContext';
+import { PostInteractionProvider } from '@/contexts/PostInteractionContext';
 import { DebugProvider, useDebug } from '@/contexts/DebugContext';
 import { LoadingSpinner, ConfirmModal } from '@/components/ui';
 import { DebugMenu, getDefaultDebugItems } from '@/components/debug';
@@ -116,9 +117,11 @@ export default function RootLayout() {
         <AuthProvider>
           <FriendsProvider>
             <ConversationsProvider>
-              <DebugProvider>
-                <RootLayoutNav />
-              </DebugProvider>
+              <PostInteractionProvider>
+                <DebugProvider>
+                  <RootLayoutNav />
+                </DebugProvider>
+              </PostInteractionProvider>
             </ConversationsProvider>
           </FriendsProvider>
         </AuthProvider>

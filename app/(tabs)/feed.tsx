@@ -2,15 +2,14 @@ import { useState, useMemo } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer, Text, PageHeader, Modal, Button, ConfirmModal, Spacer } from '@/components/ui';
-import { PostCard, PostInteractionModal, type InteractionType } from '@/components/posts';
+import { PostCard } from '@/components/posts';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { deletePost } from '@/services/posts';
 import { findOrCreateDM } from '@/services/conversations';
 import { useFriends } from '@/contexts/FriendsContext';
-import { createMessage } from '@/services/messages';
 import { getErrorMessage } from '@/utils/errors';
-import { type PostWithAuthor, type QuotedContent } from '@/types';
+import { type PostWithAuthor } from '@/types';
 import { useFeedPosts } from '@/hooks/useFeedPosts';
 
 export default function FeedScreen() {
@@ -38,66 +37,6 @@ export default function FeedScreen() {
   const [showNonOwnerModal, setShowNonOwnerModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-
-  // Interaction modal state
-  const [interactionPost, setInteractionPost] = useState<PostWithAuthor | null>(null);
-  const [interactionType, setInteractionType] = useState<InteractionType>('heart');
-  const [showInteractionModal, setShowInteractionModal] = useState(false);
-  const [sendingInteraction, setSendingInteraction] = useState(false);
-
-  const handleHeartPress = (post: PostWithAuthor) => {
-    setInteractionPost(post);
-    setInteractionType('heart');
-    setShowInteractionModal(true);
-  };
-
-  const handleCommentPress = (post: PostWithAuthor) => {
-    setInteractionPost(post);
-    setInteractionType('comment');
-    setShowInteractionModal(true);
-  };
-
-  const handleSendInteraction = async (
-    conversationId: string,
-    messageType: 'heart' | 'comment',
-    content: string | undefined,
-    heartCount?: number
-  ) => {
-    if (!interactionPost || !user) return;
-
-    setSendingInteraction(true);
-    try {
-      // Create quoted content for the post
-      const quotedContent: QuotedContent = {
-        type: 'post',
-        postId: interactionPost.id,
-        preview: {
-          authorName: interactionPost.author.fullName,
-          authorUsername: interactionPost.author.username,
-          text: interactionPost.textBody || undefined,
-          mediaUrl: interactionPost.media.length > 0 ? interactionPost.media[0].url : undefined,
-        },
-      };
-
-      // Send message with quoted post
-      await createMessage({
-        conversationId,
-        senderId: user.uid,
-        type: messageType === 'heart' ? 'heart' : 'comment',
-        content: messageType === 'heart' ? undefined : content,
-        quotedContent,
-        heartCount: messageType === 'heart' ? heartCount || 1 : undefined,
-      });
-
-      setShowInteractionModal(false);
-      setInteractionPost(null);
-    } catch (err) {
-      Alert.alert('Error', getErrorMessage(err));
-      throw err; // Re-throw so modal can handle it
-    } finally {
-      setSendingInteraction(false);
-    }
-  };
 
   const handleAuthorPress = (post: PostWithAuthor) => {
     router.push(`/user/${post.authorId}`);
@@ -165,17 +104,10 @@ export default function FeedScreen() {
     setSelectedPost(null);
   };
 
-  const closeInteractionModal = () => {
-    setShowInteractionModal(false);
-    setInteractionPost(null);
-  };
-
   const renderPost = ({ item }: { item: PostWithAuthor }) => (
     <PostCard
       post={item}
       onAuthorPress={() => handleAuthorPress(item)}
-      onHeartPress={() => handleHeartPress(item)}
-      onCommentPress={() => handleCommentPress(item)}
       onMediaPress={(index) => handleMediaPress(item, index)}
       onOptionsPress={() => handleOptionsPress(item)}
       isOwner={item.authorId === user?.uid}
@@ -230,16 +162,6 @@ export default function FeedScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-
-      {/* Interaction Modal (Heart/Comment) */}
-      <PostInteractionModal
-        visible={showInteractionModal}
-        onClose={closeInteractionModal}
-        onSend={handleSendInteraction}
-        post={interactionPost}
-        type={interactionType}
-        loading={sendingInteraction}
-      />
 
       {/* Post Options Modal (Owner) */}
       <Modal visible={showOptionsModal} onClose={closeModals} title="Post Options">

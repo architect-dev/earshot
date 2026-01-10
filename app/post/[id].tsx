@@ -5,15 +5,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { ScreenContainer, Text, Avatar, Modal, Button } from '@/components/ui';
 import { PostCard } from '@/components/posts';
-import { PostInteractionModal } from '@/components/posts/PostInteractionModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriends } from '@/contexts/FriendsContext';
 import { getPostWithAuthor } from '@/services/posts';
 import { findOrCreateDM } from '@/services/conversations';
-import { createMessage as createMessageService } from '@/services/messages';
 import { getErrorMessage } from '@/utils/errors';
-import { type PostWithAuthor, type QuotedContent } from '@/types';
+import { type PostWithAuthor } from '@/types';
 
 export default function PostDetailScreen() {
   const { theme } = useTheme();
@@ -25,9 +23,6 @@ export default function PostDetailScreen() {
 
   const [post, setPost] = useState<PostWithAuthor | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showInteractionModal, setShowInteractionModal] = useState(false);
-  const [interactionType, setInteractionType] = useState<'heart' | 'comment'>('heart');
-  const [sendingInteraction, setSendingInteraction] = useState(false);
   const [showNonOwnerModal, setShowNonOwnerModal] = useState(false);
 
   const loadPost = useCallback(async () => {
@@ -53,59 +48,6 @@ export default function PostDetailScreen() {
   useEffect(() => {
     loadPost();
   }, [loadPost]);
-
-  const handleHeartPress = () => {
-    if (!post) return;
-    setInteractionType('heart');
-    setShowInteractionModal(true);
-  };
-
-  const handleCommentPress = () => {
-    if (!post) return;
-    setInteractionType('comment');
-    setShowInteractionModal(true);
-  };
-
-  const handleSendInteraction = async (
-    conversationId: string,
-    messageType: 'heart' | 'comment',
-    content: string | undefined,
-    heartCount?: number
-  ) => {
-    if (!post || !user) return;
-
-    setSendingInteraction(true);
-    try {
-      // Create quoted content for the post
-      const quotedContent: QuotedContent = {
-        type: 'post',
-        postId: post.id,
-        preview: {
-          authorName: post.author.fullName,
-          authorUsername: post.author.username,
-          text: post.textBody || undefined,
-          mediaUrl: post.media.length > 0 ? post.media[0].url : undefined,
-        },
-      };
-
-      // Send message with quoted post
-      await createMessageService({
-        conversationId,
-        senderId: user.uid,
-        type: messageType === 'heart' ? 'heart' : 'comment',
-        content: messageType === 'heart' ? undefined : content,
-        quotedContent,
-        heartCount: messageType === 'heart' ? heartCount || 1 : undefined,
-      });
-
-      setShowInteractionModal(false);
-    } catch (err) {
-      Alert.alert('Error', getErrorMessage(err));
-      throw err;
-    } finally {
-      setSendingInteraction(false);
-    }
-  };
 
   const handleMediaPress = () => {
     // TODO: Open MediaViewer
@@ -181,28 +123,12 @@ export default function PostDetailScreen() {
       <View style={styles.content}>
         <PostCard
           post={post}
-          onHeartPress={handleHeartPress}
-          onCommentPress={handleCommentPress}
           onMediaPress={handleMediaPress}
           onOptionsPress={handleOptionsPress}
           isOwner={post.authorId === user?.uid}
           disableAuthorPress={true}
         />
       </View>
-
-      {/* Interaction Modal */}
-      {post && (
-        <PostInteractionModal
-          visible={showInteractionModal}
-          onClose={() => {
-            setShowInteractionModal(false);
-          }}
-          onSend={handleSendInteraction}
-          post={post}
-          type={interactionType}
-          loading={sendingInteraction}
-        />
-      )}
 
       {/* Post Options Modal (Non-Owner) */}
       <Modal visible={showNonOwnerModal} onClose={() => setShowNonOwnerModal(false)} title="Post Options">

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { usePostInteraction } from '@/contexts/PostInteractionContext';
 import { Text, Avatar } from '@/components/ui';
 import { MediaSlideshow } from './MediaSlideshow';
 import { formatTimestamp } from '@/utils/formatting';
@@ -10,8 +11,6 @@ import { type PostWithAuthor } from '@/types';
 interface PostCardProps {
   post: PostWithAuthor;
   onAuthorPress?: () => void;
-  onHeartPress?: () => void;
-  onCommentPress?: () => void;
   onMediaPress?: (index: number) => void;
   onOptionsPress?: () => void;
   isOwner?: boolean;
@@ -21,14 +20,13 @@ interface PostCardProps {
 export function PostCard({
   post,
   onAuthorPress,
-  onHeartPress,
-  onCommentPress,
   onMediaPress,
   onOptionsPress,
   isOwner = false,
   disableAuthorPress = false,
 }: PostCardProps) {
   const { theme } = useTheme();
+  const { handleHeartPress, handleCommentPress } = usePostInteraction();
 
   return (
     <View style={[styles.container, { borderBottomColor: theme.colors.highlightLow }]}>
@@ -72,10 +70,10 @@ export function PostCard({
       {/* Actions - only show heart/comment for other users' posts */}
       {!isOwner && (
         <View style={styles.actions}>
-          <Pressable onPress={onHeartPress} style={styles.actionButton}>
+          <Pressable onPress={() => handleHeartPress(post)} style={styles.actionButton}>
             <FontAwesome6 name="heart" size={18} color={theme.colors.love} />
           </Pressable>
-          <Pressable onPress={onCommentPress} style={styles.actionButton}>
+          <Pressable onPress={() => handleCommentPress(post)} style={styles.actionButton}>
             <FontAwesome6 name="message" size={18} color={theme.colors.pine} />
           </Pressable>
         </View>
