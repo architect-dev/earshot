@@ -4,7 +4,7 @@ import { ScreenContainer, Text, PageHeader } from '@/components/ui';
 export default function MessagesScreen() {
   return (
     <ScreenContainer>
-      <PageHeader icon=")(" title="Messages" />
+      <PageHeader icon=")(" title="Talk" />
       <View style={styles.content}>
         <Text color="subtle" align="center">
           Your conversations will appear here

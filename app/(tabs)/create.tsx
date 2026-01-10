@@ -67,7 +67,7 @@ export default function CreateScreen() {
     <ScreenContainer>
       <PageHeader
         icon="))"
-        title="Create"
+        title="Speak"
         rightElement={
           (photos.length > 0 || textBody) && !isSubmitting ? (
             <Button title="CLEAR" variant="ghost" size="small" onPress={handleReset} />
