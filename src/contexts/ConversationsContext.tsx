@@ -3,7 +3,7 @@ import { type DocumentSnapshot, type Timestamp } from 'firebase/firestore';
 import { getUserConversations } from '@/services/conversations';
 import { getConversationMessages } from '@/services/messages';
 import { subscribeToQuery, COLLECTIONS, where, orderBy, limit } from '@/services/firebase/firestore';
-import { type Conversation, type Message } from '@/types';
+import { type Conversation, type Message, type QuotedContent } from '@/types';
 import { GetProfileByIdFn, type Profile } from '@/types/profile';
 import { useAuth } from './AuthContext';
 import { useFriends } from './FriendsContext';
@@ -19,6 +19,19 @@ export interface ConversationMessages {
   cursor: DocumentSnapshot | null;
   hasMore: boolean;
   lastFetchedAt: Timestamp;
+}
+
+// Pending message (before it's persisted to Firestore)
+export interface PendingMessage {
+  pendingId: string; // Format: pending-${userId}-${timestampMs}
+  conversationId: string;
+  senderId: string;
+  type: 'text' | 'photo';
+  content?: string;
+  mediaUri?: string;
+  quotedContent?: QuotedContent;
+  createdAt: Date;
+  status: 'sending' | 'failed';
 }
 
 // Helper function to enrich a conversation with friend data
@@ -49,6 +62,12 @@ interface ConversationsContextValue {
   getMessages: (conversationId: string) => ConversationMessages | undefined;
   loadMoreMessages: (conversationId: string) => Promise<void>;
   messagesLoading: Map<string, boolean>;
+  // Pending message methods
+  addPendingMessage: (conversationId: string, pendingMessage: PendingMessage) => void;
+  removePendingMessage: (conversationId: string, pendingId: string) => void;
+  getPendingMessages: (conversationId: string) => PendingMessage[];
+  updatePendingMessageStatus: (conversationId: string, pendingId: string, status: 'sending' | 'failed') => void;
+  onConversationClosed: (conversationId: string) => void;
 }
 
 const ConversationsContext = createContext<ConversationsContextValue | undefined>(undefined);
@@ -64,13 +83,14 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const activeConversationIdRef = useRef<string | null>(null);
   const [messages, setMessages] = useState<Map<string, ConversationMessages>>(new Map());
   const [messagesLoading, setMessagesLoading] = useState<Map<string, boolean>>(new Map());
+  const [pendingMessages, setPendingMessages] = useState<Map<string, PendingMessage[]>>(new Map());
 
   // Track subscriptions for cleanup
   const conversationsUnsubscribeRef = useRef<(() => void) | null>(null);
   const messagesUnsubscribeRefs = useRef<Map<string, () => void>>(new Map());
-  const activeConversationIdRef = useRef<string | null>(null);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -285,6 +305,11 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
               // We only get the latest message (limit 1), so messages[0] is the newest
               const latestMessage = messages[0];
 
+              // Remove pending message if it exists and new message has a pendingId
+              if (latestMessage.pendingId) {
+                removePendingMessage(conversationId, latestMessage.pendingId);
+              }
+
               // Update messages with the new message
               setMessages((prev) => {
                 const existing = prev.get(conversationId);
@@ -336,6 +361,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
         currentRef.delete(conversationId);
       });
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, conversationIds]);
 
   // Get conversation by ID
@@ -395,6 +421,77 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
     [messages]
   );
 
+  // Pending message management functions
+  const addPendingMessage = useCallback(
+    (conversationId: string, pendingMessage: PendingMessage) => {
+      setPendingMessages((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(conversationId) || [];
+
+        // Check if a real message with this pendingId already exists (race condition protection)
+        const messagesData = messages.get(conversationId);
+        if (messagesData?.messages.some((msg) => msg.pendingId === pendingMessage.pendingId)) {
+          // Real message already exists, don't add pending
+          return prev;
+        }
+
+        newMap.set(conversationId, [...existing, pendingMessage]);
+        return newMap;
+      });
+    },
+    [messages]
+  );
+
+  const removePendingMessage = useCallback((conversationId: string, pendingId: string) => {
+    setPendingMessages((prev) => {
+      const newMap = new Map(prev);
+      const conversationPending = newMap.get(conversationId) || [];
+      const filtered = conversationPending.filter((p) => p.pendingId !== pendingId);
+      if (filtered.length === 0) {
+        newMap.delete(conversationId);
+      } else {
+        newMap.set(conversationId, filtered);
+      }
+      return newMap;
+    });
+  }, []);
+
+  const getPendingMessages = useCallback(
+    (conversationId: string): PendingMessage[] => {
+      return pendingMessages.get(conversationId) || [];
+    },
+    [pendingMessages]
+  );
+
+  const updatePendingMessageStatus = useCallback(
+    (conversationId: string, pendingId: string, status: 'sending' | 'failed') => {
+      setPendingMessages((prev) => {
+        const newMap = new Map(prev);
+        const conversationPending = newMap.get(conversationId) || [];
+        const updated = conversationPending.map((p) => (p.pendingId === pendingId ? { ...p, status } : p));
+        newMap.set(conversationId, updated);
+        return newMap;
+      });
+    },
+    []
+  );
+
+  const clearPendingMessages = useCallback((conversationId: string) => {
+    setPendingMessages((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(conversationId);
+      return newMap;
+    });
+  }, []);
+
+  const onConversationClosed = useCallback(
+    (conversationId: string) => {
+      clearPendingMessages(conversationId);
+      // Future: Add other cleanup logic here (e.g., unsubscribe from typing indicators)
+    },
+    [clearPendingMessages]
+  );
+
   // Loading is true if conversations are loading OR friends are loading
   const isLoading = loading || friendsLoading;
 
@@ -409,6 +506,11 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
     getMessages,
     loadMoreMessages,
     messagesLoading,
+    addPendingMessage,
+    removePendingMessage,
+    getPendingMessages,
+    updatePendingMessageStatus,
+    onConversationClosed,
   };
 
   return <ConversationsContext.Provider value={value}>{children}</ConversationsContext.Provider>;
@@ -424,11 +526,56 @@ export function useConversations(): ConversationsContextValue {
 
 // Hook to get conversation and messages for a specific conversation ID
 export function useConversation(conversationId: string | null | undefined) {
-  const { getConversationById, getMessages, messagesLoading, loadMoreMessages } = useConversations();
+  const {
+    getConversationById,
+    getMessages,
+    messagesLoading,
+    loadMoreMessages,
+    addPendingMessage: addPendingMessageContext,
+    removePendingMessage: removePendingMessageContext,
+    getPendingMessages: getPendingMessagesContext,
+    updatePendingMessageStatus: updatePendingMessageStatusContext,
+    onConversationClosed: onConversationClosedContext,
+  } = useConversations();
 
   const conversation = conversationId ? getConversationById(conversationId) : undefined;
   const messagesData = conversationId ? getMessages(conversationId) : undefined;
   const loading = conversationId ? (messagesLoading.get(conversationId) ?? false) : false;
+  const pendingMessages = conversationId ? getPendingMessagesContext(conversationId) : [];
+
+  // Pending message functions bound to this conversationId
+  const addPendingMessage = useCallback(
+    (pendingMessage: PendingMessage) => {
+      if (conversationId) {
+        addPendingMessageContext(conversationId, pendingMessage);
+      }
+    },
+    [conversationId, addPendingMessageContext]
+  );
+
+  const removePendingMessage = useCallback(
+    (pendingId: string) => {
+      if (conversationId) {
+        removePendingMessageContext(conversationId, pendingId);
+      }
+    },
+    [conversationId, removePendingMessageContext]
+  );
+
+  const updatePendingMessageStatus = useCallback(
+    (pendingId: string, status: 'sending' | 'failed') => {
+      if (conversationId) {
+        updatePendingMessageStatusContext(conversationId, pendingId, status);
+      }
+    },
+    [conversationId, updatePendingMessageStatusContext]
+  );
+
+  const onConversationClosed = useCallback(() => {
+    if (conversationId) {
+      onConversationClosedContext(conversationId);
+    }
+  }, [conversationId, onConversationClosedContext]);
 
   return {
     conversation,
@@ -437,5 +584,11 @@ export function useConversation(conversationId: string | null | undefined) {
     hasMore: messagesData?.hasMore ?? false,
     loading,
     loadMoreMessages: conversationId ? () => loadMoreMessages(conversationId) : undefined,
+    // Pending message functions
+    pendingMessages,
+    addPendingMessage,
+    removePendingMessage,
+    updatePendingMessageStatus,
+    onConversationClosed,
   };
 }

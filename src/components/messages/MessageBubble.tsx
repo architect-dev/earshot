@@ -142,7 +142,7 @@ export function MessageBubble({
 
   return (
     <Pressable
-      style={[styles.container, isOwn ? styles.ownContainer : styles.otherContainer]}
+      style={[styles.container, isOwn ? styles.ownContainer : styles.otherContainer, { opacity }]}
       onPress={onPress}
       onLongPress={onLongPress}
     >

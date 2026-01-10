@@ -104,6 +104,7 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
     quotedContent: cleanQuotedContent,
     reactionType: data.reactionType || null,
     heartCount: data.type === 'heart' ? data.heartCount || 1 : null,
+    pendingId: data.pendingId || null,
     createdAt: serverTimestamp(),
     readBy: [data.senderId], // Sender has "read" their own message
   };

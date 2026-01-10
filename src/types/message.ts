@@ -16,6 +16,7 @@ export interface Message {
   quotedContent?: QuotedContent; // Optional quoted post or message
   reactionType?: ReactionType; // For reaction messages (type='reaction')
   heartCount?: number; // For heart messages (type='heart'), default: 1
+  pendingId?: string; // ID of pending message that this replaces (format: pending-${userId}-${timestampMs})
   createdAt: Timestamp;
   readBy: string[]; // Array of user IDs who have read this message
   deletedAt?: Timestamp | null; // Timestamp when message was deleted (null if not deleted)
@@ -32,6 +33,7 @@ export interface CreateMessageData {
   quotedContent?: QuotedContent;
   reactionType?: ReactionType; // Required if type='reaction'
   heartCount?: number; // For heart messages (type='heart'), default: 1
+  pendingId?: string; // ID of pending message that this replaces (format: pending-${userId}-${timestampMs})
 }
 
 // For updating message (e.g., read receipts, deletion)

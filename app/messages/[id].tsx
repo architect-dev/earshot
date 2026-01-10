@@ -7,7 +7,7 @@ import { ScreenContainer, Text, Avatar } from '@/components/ui';
 import { MessageBubble, MessageInput, MessageContextModal } from '@/components/messages';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useConversations, useConversation } from '@/contexts/ConversationsContext';
+import { useConversations, useConversation, type PendingMessage } from '@/contexts/ConversationsContext';
 import { createMessage, markMessagesAsRead } from '@/services/messages';
 import { getDocument } from '@/services/firebase/firestore';
 import { COLLECTIONS } from '@/services/firebase/firestore';
@@ -15,18 +15,6 @@ import { uploadFile, getMessageMediaPath } from '@/services/firebase/storage';
 import { getErrorMessage } from '@/utils/errors';
 import { type Message, type User, type QuotedContent } from '@/types';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-
-interface PendingMessage {
-  tempId: string;
-  conversationId: string;
-  senderId: string;
-  type: 'text' | 'photo';
-  content?: string;
-  mediaUri?: string;
-  quotedContent?: QuotedContent;
-  createdAt: Date;
-  status: 'pending' | 'sending' | 'sent' | 'failed';
-}
 
 const MAX_DIMENSION = 1440;
 const JPEG_QUALITY = 0.8;
@@ -68,10 +56,19 @@ export default function ConversationScreen() {
   const { id: conversationId } = useLocalSearchParams<{ id: string }>();
 
   // Use the hook to get conversation and messages
-  const { conversation, messages, hasMore, loading, loadMoreMessages: loadMore } = useConversation(conversationId);
+  const {
+    conversation,
+    messages,
+    hasMore,
+    loading,
+    loadMoreMessages: loadMore,
+    pendingMessages,
+    addPendingMessage,
+    updatePendingMessageStatus,
+    onConversationClosed,
+  } = useConversation(conversationId);
 
   // UI-specific state
-  const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [quotedContent, setQuotedContent] = useState<QuotedContent | null>(null);
   const [contextModalVisible, setContextModalVisible] = useState(false);
@@ -90,7 +87,9 @@ export default function ConversationScreen() {
     }
     return () => {
       setActiveConversationId(null);
+      onConversationClosed();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, setActiveConversationId]);
 
   // Handle conversation not found
@@ -151,9 +150,9 @@ export default function ConversationScreen() {
     async (content: string, mediaUri?: string) => {
       if (!user || !conversationId || sending) return;
 
-      const tempId = `pending-${Date.now()}-${Math.random()}`;
+      const pendingId = `pending-${user.uid}-${Date.now()}`;
       const pendingMessage: PendingMessage = {
-        tempId,
+        pendingId,
         conversationId,
         senderId: user.uid,
         type: mediaUri ? 'photo' : 'text',
@@ -164,8 +163,8 @@ export default function ConversationScreen() {
         status: 'sending',
       };
 
-      // Add to pending messages immediately
-      setPendingMessages((prev) => [...prev, pendingMessage]);
+      // Add to pending messages immediately (synchronous)
+      addPendingMessage(pendingMessage);
       setSending(true);
       setQuotedContent(null); // Clear quote after sending
 
@@ -175,12 +174,12 @@ export default function ConversationScreen() {
         // Upload photo if provided
         if (mediaUri) {
           const blob = await processMessageImage(mediaUri);
-          const messageId = tempId; // Temporary ID for storage path
-          const storagePath = getMessageMediaPath(conversationId, messageId, 'jpg');
+          // Use pendingId for storage path (will be replaced with real messageId later)
+          const storagePath = getMessageMediaPath(conversationId, pendingId, 'jpg');
           mediaUrl = await uploadFile(storagePath, blob, { contentType: 'image/jpeg' });
         }
 
-        // Create message (will arrive via real-time subscription)
+        // Create message with pendingId (will arrive via real-time subscription)
         await createMessage({
           conversationId,
           senderId: user.uid,
@@ -188,19 +187,19 @@ export default function ConversationScreen() {
           content: content || undefined,
           mediaUrl,
           quotedContent: quotedContent || undefined,
+          pendingId,
         });
 
-        // Remove pending message (real message will arrive via listener)
-        setPendingMessages((prev) => prev.filter((p) => p.tempId !== tempId));
+        // Pending message will be removed automatically when real message arrives via subscription
       } catch (err) {
         // Mark as failed
-        setPendingMessages((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, status: 'failed' as const } : p)));
+        updatePendingMessageStatus(pendingId, 'failed');
         Alert.alert('Error', getErrorMessage(err));
       } finally {
         setSending(false);
       }
     },
-    [user, conversationId, sending, quotedContent]
+    [user, conversationId, sending, quotedContent, addPendingMessage, updatePendingMessageStatus]
   );
 
   // Get user profile for a participant
@@ -220,14 +219,15 @@ export default function ConversationScreen() {
   // Messages are already sorted newest first (from getConversationMessages)
   // We'll add pending messages at the beginning (newest)
   const displayMessages = useMemo(() => {
-    const allMessages: Array<Message | PendingMessage> = [...messages];
+    if (!conversationId) return [];
 
+    const allMessages: Array<Message | PendingMessage> = [...messages];
     // Add pending messages at the beginning (most recent)
     for (const pending of pendingMessages) {
       // Convert pending to message-like object for display
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const pendingAsMessage: any = {
-        id: pending.tempId,
+        id: pending.pendingId,
         conversationId: pending.conversationId,
         senderId: pending.senderId,
         type: pending.type,
@@ -237,12 +237,13 @@ export default function ConversationScreen() {
         createdAt: { toDate: () => pending.createdAt, toMillis: () => pending.createdAt.getTime() },
         readBy: [],
         deletedAt: null,
+        status: pending.status,
       };
       allMessages.unshift(pendingAsMessage);
     }
 
     return allMessages;
-  }, [messages, pendingMessages]);
+  }, [messages, conversationId, pendingMessages]);
 
   // Get other user info (for DMs)
   const otherUser = useMemo(() => {
@@ -311,7 +312,7 @@ export default function ConversationScreen() {
       // Find the message in the display messages (includes pending)
       const allMessages = displayMessages;
       const messageIndex = allMessages.findIndex((msg) => {
-        // Check if it's a Message (has id) or PendingMessage (has tempId)
+        // Check if it's a Message (has id) or PendingMessage (has pendingId)
         return 'id' in msg ? msg.id === messageId : false;
       });
       if (messageIndex !== -1 && flatListRef.current) {
@@ -387,7 +388,7 @@ export default function ConversationScreen() {
         renderItem={({ item }) => {
           const isOwn = item.senderId === user?.uid;
           const isPending = 'status' in item && item.status !== 'sent';
-          const opacity = isPending ? 0.5 : 1;
+          const opacity = isPending ? 0.75 : 1;
 
           // Get sender info for group chats
           let senderName: string | undefined;
@@ -398,7 +399,7 @@ export default function ConversationScreen() {
             senderAvatar = senderProfile?.profilePhotoUrl;
           }
 
-          const messageId = 'id' in item ? item.id : item.tempId;
+          const messageId = 'id' in item ? item.id : item.pendingId;
           const isHighlighted = highlightedMessageId === messageId;
 
           return (
