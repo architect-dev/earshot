@@ -1,6 +1,5 @@
 import {
   COLLECTIONS,
-  addDocument,
   getDocument,
   updateDocument,
   deleteDocument,
@@ -10,6 +9,10 @@ import {
   orderBy,
   serverTimestamp,
   Timestamp,
+  runFirestoreTransaction,
+  createBatch,
+  arrayUnion,
+  getDocRef,
   type DocumentSnapshot,
 } from './firebase/firestore';
 import { type Message, type CreateMessageData, type ReactionType, type QuotedMessage } from '@/types';
@@ -105,31 +108,68 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
     readBy: [data.senderId], // Sender has "read" their own message
   };
 
-  const messageId = await addDocument(COLLECTIONS.MESSAGES, messageData);
+  // Use transaction to atomically create message and update conversation
+  // IMPORTANT: All reads must come before all writes in Firestore transactions
+  const messageId = await runFirestoreTransaction(async (transaction) => {
+    // STEP 1: READ - Get conversation document first (all reads must be before writes)
+    const conversationRef = getDocRef(COLLECTIONS.CONVERSATIONS, data.conversationId);
+    const conversationDoc = await transaction.get(conversationRef);
 
-  // Update conversation's lastMessageAt with local timestamp (for sorting)
-  // The actual message has serverTimestamp for accuracy
-  // Note: Reaction messages don't update lastMessageAt (they shouldn't bump conversation to top)
-  if (data.type !== 'reaction') {
-    await updateConversation(data.conversationId, {
-      lastMessageAt: Timestamp.now(),
-    });
-  }
-
-  // Increment unread counts for all participants except sender
-  // (conversation already fetched above)
-  const updatedUnreadCounts = { ...conversation.unreadCounts };
-  Object.keys(updatedUnreadCounts).forEach((userId) => {
-    if (userId !== data.senderId) {
-      updatedUnreadCounts[userId] = (updatedUnreadCounts[userId] || 0) + 1;
+    if (!conversationDoc.exists()) {
+      throw new Error('Conversation not found');
     }
+
+    const conversationData = conversationDoc.data() as { unreadCounts: Record<string, number> };
+
+    // STEP 2: WRITES - Now do all writes (message creation and conversation update)
+    // Create message document
+    const messageRef = getDocRef(COLLECTIONS.MESSAGES);
+    transaction.set(messageRef, {
+      ...messageData,
+      updatedAt: serverTimestamp(),
+    });
+
+    // Prepare conversation updates
+    const conversationUpdates: Record<string, unknown> = {
+      updatedAt: serverTimestamp(),
+    };
+
+    // Update lastMessageAt (reaction messages don't bump conversation to top)
+    if (data.type !== 'reaction') {
+      conversationUpdates.lastMessageAt = Timestamp.now();
+    }
+
+    // Increment unread counts for all participants except sender
+    const updatedUnreadCounts = { ...conversationData.unreadCounts };
+    Object.keys(updatedUnreadCounts).forEach((userId) => {
+      if (userId !== data.senderId) {
+        updatedUnreadCounts[userId] = (updatedUnreadCounts[userId] || 0) + 1;
+      }
+    });
+    conversationUpdates.unreadCounts = updatedUnreadCounts;
+
+    // Update conversation
+    transaction.update(conversationRef, conversationUpdates);
+
+    return messageRef.id;
   });
-  await updateConversation(data.conversationId, { unreadCounts: updatedUnreadCounts });
 
   // Get the created message to return
   const createdMessage = await getMessage(messageId);
   if (!createdMessage) {
     throw new Error('Failed to retrieve created message');
+  }
+
+  // Update conversation's latestMessage (non-critical, can happen after transaction)
+  // This is for caching/preview purposes, so slight delay is acceptable
+  if (data.type !== 'reaction') {
+    await updateConversation(data.conversationId, {
+      latestMessage: createdMessage,
+    }).catch((err) => {
+      // Log but don't fail - this is a cache update, not critical
+      // eslint-disable-next-line no-console
+      console.error('Error updating latestMessage:', err);
+    });
   }
 
   return createdMessage;
@@ -185,26 +225,25 @@ export async function getLastMessage(conversationId: string): Promise<Message | 
  * Mark messages as read
  */
 export async function markMessagesAsRead(conversationId: string, userId: string, messageIds: string[]): Promise<void> {
-  // Update each message's readBy array
+  // Use batch write for efficient updates
+  const batch = createBatch();
+
+  // Update each message's readBy array using arrayUnion
   for (const messageId of messageIds) {
-    const message = await getMessage(messageId);
-    if (message && !message.readBy.includes(userId)) {
-      await updateDocument(COLLECTIONS.MESSAGES, messageId, {
-        readBy: [...message.readBy, userId],
-      });
-    }
+    const messageRef = getDocRef(COLLECTIONS.MESSAGES, messageId);
+    batch.update(messageRef, {
+      readBy: arrayUnion(userId),
+    });
   }
 
   // Reset unread count for this user in the conversation
-  const conversation = await getConversation(conversationId);
-  if (conversation) {
-    await updateConversation(conversationId, {
-      unreadCounts: {
-        ...conversation.unreadCounts,
-        [userId]: 0,
-      },
-    });
-  }
+  const conversationRef = getDocRef(COLLECTIONS.CONVERSATIONS, conversationId);
+  batch.update(conversationRef, {
+    [`unreadCounts.${userId}`]: 0,
+  });
+
+  // Commit all updates in a single batch
+  await batch.commit();
 }
 
 /**

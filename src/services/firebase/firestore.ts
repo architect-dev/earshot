@@ -13,6 +13,9 @@ import {
   startAfter,
   onSnapshot,
   serverTimestamp,
+  runTransaction,
+  writeBatch,
+  arrayUnion,
   type DocumentData,
   type QueryConstraint,
   type DocumentReference,
@@ -204,5 +207,22 @@ export function timestampToDate(timestamp: Timestamp | null | undefined): Date |
   return timestamp.toDate();
 }
 
+/**
+ * Run a Firestore transaction
+ * The updateFunction receives a transaction object and should return the result
+ */
+export async function runFirestoreTransaction<T>(
+  updateFunction: (transaction: Parameters<Parameters<typeof runTransaction>[1]>[0]) => Promise<T>
+): Promise<T> {
+  return runTransaction(db, updateFunction);
+}
+
+/**
+ * Create a Firestore batch for multiple writes
+ */
+export function createBatch() {
+  return writeBatch(db);
+}
+
 // Re-export commonly used Firestore functions for convenience
-export { where, orderBy, limit, startAfter, serverTimestamp, Timestamp, type DocumentSnapshot };
+export { where, orderBy, limit, startAfter, serverTimestamp, Timestamp, arrayUnion, type DocumentSnapshot };

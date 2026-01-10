@@ -1,4 +1,5 @@
 import { type Timestamp } from 'firebase/firestore';
+import { type Message } from './message';
 
 export type ConversationType = 'dm' | 'group';
 
@@ -35,6 +36,7 @@ export interface Conversation {
   createdBy: string; // User ID
   createdAt: Timestamp;
   lastMessageAt: Timestamp | null; // Timestamp for sorting, updated when new messages arrive
+  latestMessage: Message | null; // Latest message in the conversation (cached)
   unreadCounts: Record<string, number>; // userId -> unread count
   mutedBy: string[]; // Array of user IDs who have muted this conversation
 }
@@ -52,6 +54,7 @@ export interface UpdateConversationData {
   participants?: string[];
   groupName?: string;
   lastMessageAt?: Timestamp | null;
+  latestMessage?: Message | null;
   unreadCounts?: Record<string, number>;
   mutedBy?: string[];
 }

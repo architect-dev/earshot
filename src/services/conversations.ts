@@ -42,6 +42,7 @@ export async function createConversation(data: CreateConversationData): Promise<
     createdBy: data.createdBy,
     createdAt: serverTimestamp(),
     lastMessageAt: null,
+    latestMessage: null,
     unreadCounts,
     mutedBy: [],
   };

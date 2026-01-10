@@ -6,6 +6,7 @@ import { StyleSheet } from 'react-native';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { FriendsProvider } from '@/contexts/FriendsContext';
+import { ConversationsProvider } from '@/contexts/ConversationsContext';
 import { DebugProvider, useDebug } from '@/contexts/DebugContext';
 import { LoadingSpinner, ConfirmModal } from '@/components/ui';
 import { DebugMenu, getDefaultDebugItems } from '@/components/debug';
@@ -114,9 +115,11 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <FriendsProvider>
-            <DebugProvider>
-              <RootLayoutNav />
-            </DebugProvider>
+            <ConversationsProvider>
+              <DebugProvider>
+                <RootLayoutNav />
+              </DebugProvider>
+            </ConversationsProvider>
           </FriendsProvider>
         </AuthProvider>
       </ThemeProvider>

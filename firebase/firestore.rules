@@ -114,9 +114,32 @@ service cloud.firestore {
                         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
                         request.auth.uid == request.resource.data.senderId;
         
+        // Participants can update readBy array (for read receipts)
+        // Only sender can update other fields (like deletedAt, content)
         allow update: if isAuthenticated() && 
                         isEmailVerified() && 
-                        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+                        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
+                        (
+                          // Allow if sender is updating their own message (e.g., deletion)
+                          // Sender can update any field
+                          request.auth.uid == resource.data.senderId ||
+                          // OR allow participants (non-senders) to update ONLY readBy field
+                          // Validate that all other fields remain unchanged
+                          (request.auth.uid != resource.data.senderId &&
+                           request.resource.data.senderId == resource.data.senderId &&
+                           request.resource.data.conversationId == resource.data.conversationId &&
+                           request.resource.data.type == resource.data.type &&
+                           request.resource.data.content == resource.data.content &&
+                           request.resource.data.mediaUrl == resource.data.mediaUrl &&
+                           request.resource.data.voiceUrl == resource.data.voiceUrl &&
+                           request.resource.data.quotedContent == resource.data.quotedContent &&
+                           request.resource.data.reactionType == resource.data.reactionType &&
+                           request.resource.data.heartCount == resource.data.heartCount &&
+                           request.resource.data.createdAt == resource.data.createdAt &&
+                           request.resource.data.deletedAt == resource.data.deletedAt &&
+                           request.resource.data.readBy != null &&
+                           request.resource.data.readBy.hasAll(resource.data.readBy))
+                        );
       }
     }
     
