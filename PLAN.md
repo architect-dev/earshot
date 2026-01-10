@@ -228,14 +228,21 @@
   - [x] Fuzzy search for friends in new conversation modal
   - [x] Find or create DM functionality
   - [x] "CREATE GROUP" button (placeholder alert)
-- [ ] Build Conversation screen (works for both DMs and groups):
-  - [ ] Message list (reverse chronological, infinite scroll - see details below)
-  - [ ] Text input
-  - [ ] Send button
-  - [ ] Photo picker
-  - [ ] Message bubbles (sent/received styling)
-  - [ ] Pending messages (50% opacity until confirmed sent)
-  - [ ] Read receipts (delivered/read)
+- [x] Build MessageInput component:
+  - [x] Text input with multiline support
+  - [x] Photo picker button
+  - [x] Voice recorder button (placeholder)
+  - [x] Send button (appears when text is entered)
+  - [x] Quoted content preview
+  - [x] Input stays focused after sending (for quick messages)
+- [x] Build Conversation screen (works for both DMs and groups):
+  - [x] Message list (reverse chronological, infinite scroll - see details below)
+  - [x] Text input
+  - [x] Send button
+  - [x] Photo picker
+  - [x] Message bubbles (sent/received styling)
+  - [x] Pending messages (50% opacity until confirmed sent)
+  - [x] Read receipts (delivered/read)
   - [ ] Typing indicators (see details below)
   - [ ] Quoted content display:
     - [ ] Support quoted posts (from PostInteractionModal)
@@ -246,10 +253,10 @@
   - [ ] Scroll-to-message functionality (when clicking quoted message - see details below)
   - [ ] Long-press on messages to open MessageContextModal
   - [ ] Mute/unmute conversation toggle
-  - [ ] Conditional UI based on conversation type:
-    - [ ] DM: Show other user's name/avatar in header
+  - [x] Conditional UI based on conversation type:
+    - [x] DM: Show other user's name/avatar in header
     - [ ] Group: Show group name and participant list/avatars
-    - [ ] Group: Show sender name in message bubbles
+    - [x] Group: Show sender name in message bubbles
 - [ ] Implement heart-to-conversation flow:
   - [ ] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
   - [ ] Send heart message with quoted post content
@@ -290,19 +297,19 @@
   - [ ] UI: Triggered from MessageContextModal "Delete" option
   - [ ] UI: Show "Deleted message" placeholder in conversation
   - [ ] UI: Confirmation modal before deletion
-- [ ] Real-time message updates (Firestore listeners for both types)
-- [ ] Infinite scroll pagination for conversations:
-  - [ ] Load initial batch (50 messages, reverse chronological)
-  - [ ] Load more on scroll up (older messages)
-  - [ ] Track cursor and hasMore state
-  - [ ] Handle empty conversation state
-  - [ ] Handle network failures during pagination
-- [ ] Optimistic UI updates (pending messages):
-  - [ ] Add pending messages to state immediately on send
-  - [ ] Show pending messages with 50% opacity
-  - [ ] Match pending messages with real messages when they arrive (by content + timestamp)
-  - [ ] Handle send failures (mark as failed, allow retry)
-  - [ ] Prevent duplicate messages when real message arrives
+- [x] Real-time message updates (Firestore listeners for both types)
+- [x] Infinite scroll pagination for conversations:
+  - [x] Load initial batch (50 messages, reverse chronological)
+  - [x] Load more on scroll up (older messages)
+  - [x] Track cursor and hasMore state
+  - [x] Handle empty conversation state
+  - [x] Handle network failures during pagination
+- [x] Optimistic UI updates (pending messages):
+  - [x] Add pending messages to state immediately on send
+  - [x] Show pending messages with 50% opacity
+  - [x] Match pending messages with real messages when they arrive (by content + timestamp)
+  - [x] Handle send failures (mark as failed, allow retry)
+  - [x] Prevent duplicate messages when real message arrives
   - [ ] Handle race conditions (real message arrives before pending is added)
 - [ ] Scroll-to-message functionality:
   - [ ] When quoted message is clicked, check if message is loaded

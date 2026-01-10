@@ -64,6 +64,33 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
     throw new Error('Conversation not found. Create the conversation before sending a message.');
   }
 
+  // Clean quoted content to remove undefined values (Firestore doesn't allow undefined)
+  const cleanQuotedContent = data.quotedContent
+    ? {
+        type: data.quotedContent.type,
+        ...(data.quotedContent.type === 'post'
+          ? {
+              postId: data.quotedContent.postId,
+              preview: {
+                authorName: data.quotedContent.preview.authorName,
+                authorUsername: data.quotedContent.preview.authorUsername,
+                ...(data.quotedContent.preview.text ? { text: data.quotedContent.preview.text } : {}),
+                ...(data.quotedContent.preview.mediaUrl ? { mediaUrl: data.quotedContent.preview.mediaUrl } : {}),
+              },
+            }
+          : {
+              messageId: data.quotedContent.messageId,
+              preview: {
+                senderName: data.quotedContent.preview.senderName,
+                senderUsername: data.quotedContent.preview.senderUsername,
+                ...(data.quotedContent.preview.text ? { text: data.quotedContent.preview.text } : {}),
+                ...(data.quotedContent.preview.mediaUrl ? { mediaUrl: data.quotedContent.preview.mediaUrl } : {}),
+                ...(data.quotedContent.preview.voiceUrl ? { voiceUrl: data.quotedContent.preview.voiceUrl } : {}),
+              },
+            }),
+      }
+    : null;
+
   const messageData = {
     conversationId: data.conversationId,
     senderId: data.senderId,
@@ -71,7 +98,7 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
     content: data.content || null,
     mediaUrl: data.mediaUrl || null,
     voiceUrl: data.voiceUrl || null,
-    quotedContent: data.quotedContent || null,
+    quotedContent: cleanQuotedContent,
     reactionType: data.reactionType || null,
     createdAt: serverTimestamp(),
     readBy: [data.senderId], // Sender has "read" their own message

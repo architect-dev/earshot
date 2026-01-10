@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { type DocumentSnapshot } from 'firebase/firestore';
 import { ScreenContainer, Text, Avatar } from '@/components/ui';
-import { MessageBubble, MessageInput } from '@/components/messages';
+import { MessageBubble, MessageInput, MessageContextModal } from '@/components/messages';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getConversation } from '@/services/conversations';
@@ -75,6 +75,8 @@ export default function ConversationScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [sending, setSending] = useState(false);
   const [quotedContent, setQuotedContent] = useState<QuotedContent | null>(null);
+  const [contextModalVisible, setContextModalVisible] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
   // Store cursor and user profiles for pagination and display
   const cursorRef = useRef<DocumentSnapshot | null>(null);
@@ -268,6 +270,36 @@ export default function ConversationScreen() {
     return conversation?.groupName || 'Group';
   }, [conversation, otherUser]);
 
+  // Handle message context modal
+  const handleMessageLongPress = useCallback((message: Message) => {
+    setSelectedMessage(message);
+    setContextModalVisible(true);
+  }, []);
+
+  const handleMessageReply = useCallback(
+    (message: Message) => {
+      // Create quoted content from message
+      const senderProfile = getUserProfile(message.senderId);
+      const quoted: QuotedContent = {
+        type: 'message',
+        messageId: message.id,
+        preview: {
+          senderName: message.senderId === user?.uid ? 'You' : senderProfile?.fullName || 'Unknown',
+          senderUsername: senderProfile?.username || '',
+          text: message.content || undefined,
+          mediaUrl: message.mediaUrl || undefined,
+        },
+      };
+      setQuotedContent(quoted);
+    },
+    [user, getUserProfile]
+  );
+
+  const handleMessageDelete = useCallback(() => {
+    // Refresh messages list to show deleted state
+    loadConversation();
+  }, [loadConversation]);
+
   if (loading) {
     return (
       <ScreenContainer>
@@ -330,9 +362,7 @@ export default function ConversationScreen() {
               senderName={senderName}
               senderAvatar={senderAvatar}
               opacity={opacity}
-              onLongPress={() => {
-                // TODO: Open MessageContextModal
-              }}
+              onLongPress={() => handleMessageLongPress(item as Message)}
             />
           );
         }}
@@ -358,6 +388,18 @@ export default function ConversationScreen() {
         quotedContent={quotedContent}
         onClearQuote={() => setQuotedContent(null)}
         disabled={sending}
+      />
+      <MessageContextModal
+        visible={contextModalVisible}
+        onClose={() => {
+          setContextModalVisible(false);
+          setSelectedMessage(null);
+        }}
+        message={selectedMessage}
+        conversationId={conversationId || ''}
+        currentUserId={user?.uid || ''}
+        onReply={handleMessageReply}
+        onDelete={handleMessageDelete}
       />
     </ScreenContainer>
   );
