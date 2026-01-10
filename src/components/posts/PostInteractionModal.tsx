@@ -23,7 +23,12 @@ export type InteractionType = 'heart' | 'comment';
 interface InteractionModalProps {
   visible: boolean;
   onClose: () => void;
-  onSend: (conversationId: string, messageType: 'heart' | 'comment', content: string | undefined) => Promise<void>;
+  onSend: (
+    conversationId: string,
+    messageType: 'heart' | 'comment',
+    content: string | undefined,
+    heartCount?: number
+  ) => Promise<void>;
   post: PostWithAuthor | null;
   type: InteractionType;
   loading?: boolean;
@@ -43,6 +48,7 @@ export function PostInteractionModal({ visible, onClose, onSend, post, type, loa
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [creatingDM, setCreatingDM] = useState(false);
+  const [heartCount, setHeartCount] = useState(1);
 
   const loadConversations = useCallback(async () => {
     if (!post || !user) return;
@@ -144,8 +150,9 @@ export function PostInteractionModal({ visible, onClose, onSend, post, type, loa
     if (type === 'comment' && !content) return;
 
     try {
-      await onSend(conversationId, type, content);
+      await onSend(conversationId, type, content, isHeartMode ? heartCount : undefined);
       setComment('');
+      setHeartCount(1);
       handleClose();
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
@@ -155,7 +162,12 @@ export function PostInteractionModal({ visible, onClose, onSend, post, type, loa
   const handleClose = () => {
     setComment('');
     setSelectedConversationId(null);
+    setHeartCount(1);
     onClose();
+  };
+
+  const handleHeartPress = () => {
+    setHeartCount((prev) => prev + 1);
   };
 
   if (!post) return null;
@@ -250,11 +262,19 @@ export function PostInteractionModal({ visible, onClose, onSend, post, type, loa
         <QuotedContent quotedContent={quotedContent} variant="modal" postReplyType={type} />
 
         {isHeartMode && (
-          <View style={styles.heartBubbleContainer}>
-            <View style={[styles.heartBubble, { backgroundColor: theme.colors.loveLow }]}>
-              <FontAwesome6 name="heart" size={20} color={theme.colors.love} solid />
-            </View>
-          </View>
+          <>
+            <Pressable onPress={handleHeartPress} style={styles.heartBubbleContainer}>
+              <View style={[styles.heartBubble, { backgroundColor: theme.colors.loveLow }]}>
+                {Array.from({ length: heartCount }, (_, i) => (
+                  <FontAwesome6 key={i} name="heart" size={20} color={theme.colors.love} solid />
+                ))}
+              </View>
+            </Pressable>
+            <Spacer size={8} />
+            <Text size="sm" color="subtle" style={styles.heartHint}>
+              (Tap to add more hearts)
+            </Text>
+          </>
         )}
 
         {!isHeartMode && (
@@ -332,8 +352,18 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   heartBubble: {
+    flexWrap: 'wrap',
     padding: 8,
     paddingHorizontal: 24,
+    flexDirection: 'row',
+    gap: 4,
+    maxWidth: '70%',
+  },
+  heartHint: {
+    width: '100%',
+    textAlign: 'right',
+    paddingHorizontal: 16,
+    fontStyle: 'italic',
   },
   commentInput: {
     minHeight: 80,

@@ -125,7 +125,14 @@ export function MessageBubble({
           </View>
         );
       case 'heart':
-        return <FontAwesome6 name="heart" size={20} color={theme.colors.love} solid />;
+        const count = message.heartCount || 1;
+        return (
+          <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
+            {Array.from({ length: count }, (_, i) => (
+              <FontAwesome6 key={i} name="heart" size={20} color={theme.colors.love} solid />
+            ))}
+          </View>
+        );
       case 'comment':
         return <Text size="sm">{message.content}</Text>;
       default:

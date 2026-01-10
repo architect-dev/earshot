@@ -250,6 +250,11 @@
       - [ ] If messages >= 24hrs old: insert break when days are different (format: "Jan 10th")
       - [ ] Display breaks centered between message groups
       - [ ] Format: "4:11pm" for same day, "Jan 10th" for different days
+  - [ ] Swipe right to reply on message:
+    - [ ] Detect swipe right gesture on message bubble
+    - [ ] Show visual feedback during swipe (message slides, reply indicator)
+    - [ ] On swipe completion, quote the message and focus input
+    - [ ] Pre-fill message input with quoted message reference
   - [ ] Typing indicators (see details below)
   - [x] Quoted content display:
     - [x] Support quoted posts (from PostInteractionModal)
@@ -274,6 +279,12 @@
   - [x] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
   - [x] Send heart message with quoted post content (type='heart', no content)
   - [x] Support sending to group chats (if user is in group with post author)
+  - [x] Heart count feature:
+    - [x] Add `heartCount` field to Message type (default: 1)
+    - [x] In PostInteractionModal heart mode: show hint "tap the heart bubble to add more hearts"
+    - [x] Make heart bubble pressable to increment heartCount before sending
+    - [x] Display multiple hearts (repeat ❤️ by heartCount) in MessageBubble
+    - [x] Update createMessage to handle heartCount
 - [x] Implement comment-to-conversation flow:
   - [x] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
   - [x] Send comment message with quoted post content

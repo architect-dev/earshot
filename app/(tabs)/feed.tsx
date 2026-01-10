@@ -8,7 +8,6 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getFeedPosts, deletePost } from '@/services/posts';
 import { getFriends } from '@/services/friends';
-import { findOrCreateDM } from '@/services/conversations';
 import { createMessage } from '@/services/messages';
 import { getErrorMessage } from '@/utils/errors';
 import { type PostWithAuthor, type QuotedContent } from '@/types';
@@ -114,7 +113,12 @@ export default function FeedScreen() {
     setShowInteractionModal(true);
   };
 
-  const handleSendInteraction = async (conversationId: string, messageType: 'heart' | 'comment', content: string | undefined) => {
+  const handleSendInteraction = async (
+    conversationId: string,
+    messageType: 'heart' | 'comment',
+    content: string | undefined,
+    heartCount?: number
+  ) => {
     if (!interactionPost || !user) return;
 
     setSendingInteraction(true);
@@ -138,6 +142,7 @@ export default function FeedScreen() {
         type: messageType === 'heart' ? 'heart' : 'comment',
         content: messageType === 'heart' ? undefined : content,
         quotedContent,
+        heartCount: messageType === 'heart' ? heartCount || 1 : undefined,
       });
 
       setShowInteractionModal(false);

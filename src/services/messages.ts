@@ -100,6 +100,7 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
     voiceUrl: data.voiceUrl || null,
     quotedContent: cleanQuotedContent,
     reactionType: data.reactionType || null,
+    heartCount: data.type === 'heart' ? data.heartCount || 1 : null,
     createdAt: serverTimestamp(),
     readBy: [data.senderId], // Sender has "read" their own message
   };
