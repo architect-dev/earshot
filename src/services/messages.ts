@@ -3,14 +3,16 @@ import {
   addDocument,
   getDocument,
   updateDocument,
+  deleteDocument,
   queryDocumentsPaginated,
+  queryDocuments,
   where,
   orderBy,
   serverTimestamp,
   Timestamp,
   type DocumentSnapshot,
 } from './firebase/firestore';
-import { type Message, type CreateMessageData } from '@/types';
+import { type Message, type CreateMessageData, type ReactionType, type QuotedMessage } from '@/types';
 import { updateConversation, getConversation } from './conversations';
 
 const MESSAGES_PAGE_SIZE = 50;
@@ -37,6 +39,15 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
     throw new Error('Voice messages must have voiceUrl');
   }
 
+  if (data.type === 'reaction') {
+    if (!data.reactionType) {
+      throw new Error('Reaction messages must have reactionType');
+    }
+    if (!data.quotedContent || data.quotedContent.type !== 'message') {
+      throw new Error('Reaction messages must quote the target message');
+    }
+  }
+
   // Validate quoted message (must be from same conversation)
   if (data.quotedContent?.type === 'message') {
     // We'll validate this when we fetch the quoted message
@@ -61,6 +72,7 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
     mediaUrl: data.mediaUrl || null,
     voiceUrl: data.voiceUrl || null,
     quotedContent: data.quotedContent || null,
+    reactionType: data.reactionType || null,
     createdAt: serverTimestamp(),
     readBy: [data.senderId], // Sender has "read" their own message
   };
@@ -69,9 +81,12 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
 
   // Update conversation's lastMessageAt with local timestamp (for sorting)
   // The actual message has serverTimestamp for accuracy
-  await updateConversation(data.conversationId, {
-    lastMessageAt: Timestamp.now(),
-  });
+  // Note: Reaction messages don't update lastMessageAt (they shouldn't bump conversation to top)
+  if (data.type !== 'reaction') {
+    await updateConversation(data.conversationId, {
+      lastMessageAt: Timestamp.now(),
+    });
+  }
 
   // Increment unread counts for all participants except sender
   // (conversation already fetched above)
@@ -193,4 +208,105 @@ export async function deleteMessage(messageId: string, userId: string): Promise<
     voiceUrl: null,
     quotedContent: null, // Also remove quoted content
   });
+}
+
+/**
+ * Toggle a reaction to a message (e.g., heart)
+ * Creates a reaction message if not present, deletes it if present (toggle behavior)
+ */
+export async function toggleMessageReaction(
+  conversationId: string,
+  targetMessageId: string,
+  userId: string,
+  reactionType: ReactionType
+): Promise<void> {
+  // Validate target message exists and is in the same conversation
+  const targetMessage = await getMessage(targetMessageId);
+  if (!targetMessage) {
+    throw new Error('Target message not found');
+  }
+
+  if (targetMessage.conversationId !== conversationId) {
+    throw new Error('Target message must be in the same conversation');
+  }
+
+  // Don't allow reacting to deleted messages
+  if (targetMessage.deletedAt) {
+    throw new Error('Cannot react to deleted messages');
+  }
+
+  // Check if user already has this reaction
+  const existingReactionId = await hasUserReacted(conversationId, targetMessageId, userId, reactionType);
+
+  if (existingReactionId) {
+    // Delete the existing reaction message
+    await deleteDocument(COLLECTIONS.MESSAGES, existingReactionId);
+  } else {
+    // Create new reaction message
+    // Get sender info for quoted message preview (can be empty/minimal)
+    const quotedMessage: QuotedMessage = {
+      type: 'message',
+      messageId: targetMessageId,
+      preview: {
+        // Preview can be empty as per requirements
+        senderName: '', // Will be populated by UI if needed
+        senderUsername: '',
+      },
+    };
+
+    await createMessage({
+      conversationId,
+      senderId: userId,
+      type: 'reaction',
+      reactionType,
+      quotedContent: quotedMessage,
+    });
+  }
+}
+
+/**
+ * Get all reaction messages for a target message
+ */
+export async function getMessageReactions(targetMessageId: string): Promise<Message[]> {
+  // Get all reaction messages that quote this target message
+  const allReactions = await queryDocuments<Message>(COLLECTIONS.MESSAGES, [where('type', '==', 'reaction')]);
+
+  return allReactions.filter(
+    (msg) => msg.quotedContent?.type === 'message' && msg.quotedContent.messageId === targetMessageId
+  );
+}
+
+/**
+ * Get reaction count for a specific reaction type on a message
+ */
+export async function getReactionCount(targetMessageId: string, reactionType: ReactionType): Promise<number> {
+  const reactions = await getMessageReactions(targetMessageId);
+  return reactions.filter((r) => r.reactionType === reactionType).length;
+}
+
+/**
+ * Check if a user has reacted to a message with a specific type
+ * Returns the reaction message ID if found, null otherwise
+ */
+export async function hasUserReacted(
+  conversationId: string,
+  targetMessageId: string,
+  userId: string,
+  reactionType: ReactionType
+): Promise<string | null> {
+  const reactions = await queryDocuments<Message>(COLLECTIONS.MESSAGES, [
+    where('conversationId', '==', conversationId),
+    where('type', '==', 'reaction'),
+    where('senderId', '==', userId),
+    where('reactionType', '==', reactionType),
+  ]);
+
+  const existingReaction = reactions.find(
+    (msg) =>
+      msg.reactionType === reactionType &&
+      msg.quotedContent?.type === 'message' &&
+      msg.quotedContent.messageId === targetMessageId
+  );
+
+  return existingReaction?.id || null;
 }

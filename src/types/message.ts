@@ -1,7 +1,9 @@
 import { type Timestamp } from 'firebase/firestore';
 import { type QuotedContent } from './conversation';
 
-export type MessageType = 'text' | 'photo' | 'video' | 'voice' | 'heart' | 'comment';
+export type MessageType = 'text' | 'photo' | 'video' | 'voice' | 'heart' | 'comment' | 'reaction';
+
+export type ReactionType = 'heart'; // Future: 'laugh', 'thumbs-up', etc.
 
 export interface Message {
   id: string;
@@ -12,6 +14,7 @@ export interface Message {
   mediaUrl?: string; // URL for photo/video
   voiceUrl?: string; // URL for voice message
   quotedContent?: QuotedContent; // Optional quoted post or message
+  reactionType?: ReactionType; // For reaction messages (type='reaction')
   createdAt: Timestamp;
   readBy: string[]; // Array of user IDs who have read this message
   deletedAt?: Timestamp | null; // Timestamp when message was deleted (null if not deleted)
@@ -26,6 +29,7 @@ export interface CreateMessageData {
   mediaUrl?: string;
   voiceUrl?: string;
   quotedContent?: QuotedContent;
+  reactionType?: ReactionType; // Required if type='reaction'
 }
 
 // For updating message (e.g., read receipts, deletion)

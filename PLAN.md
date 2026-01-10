@@ -186,29 +186,34 @@
 
 #### Data Model & Infrastructure
 
-- [ ] Create Conversations collection (unified for DMs and groups):
-  - [ ] Participants array (user IDs)
-  - [ ] Type field (`'dm'` | `'group'`) or derive from participant count
-  - [ ] Group name (null for DMs, required for groups)
-  - [ ] Created by (user ID)
-  - [ ] Created at (timestamp)
-  - [ ] Last message (reference or snapshot)
-  - [ ] Last message at (timestamp)
-  - [ ] Unread counts (per participant)
-- [ ] Create Messages collection:
-  - [ ] Conversation ID (reference)
-  - [ ] Sender ID (user ID)
-  - [ ] Content (text, media URL, voice URL)
-  - [ ] Type (`'text'` | `'photo'` | `'video'` | `'voice'` | `'heart'` | `'comment'`)
-  - [ ] Quoted content (optional):
-    - [ ] Type (`'post'` | `'message'`)
-    - [ ] Post reference (if type='post')
-    - [ ] Message reference (if type='message') - message ID only (same conversation)
-    - [ ] Preview data (text preview, media thumbnail, sender info)
-    - [ ] Constraint: Quoted messages must be from the same conversation
-  - [ ] Created at (timestamp)
-  - [ ] Read receipts (array of user IDs who have read)
-- [ ] Design services layer to handle both DM and group chat operations
+- [x] Create Conversations collection (unified for DMs and groups):
+  - [x] Participants array (user IDs)
+  - [x] Type field (`'dm'` | `'group'`) or derive from participant count
+  - [x] Group name (null for DMs, required for groups)
+  - [x] Created by (user ID)
+  - [x] Created at (timestamp)
+  - [x] Last message at (timestamp) - using hybrid approach (timestamp only, no full message object)
+  - [x] Unread counts (per participant)
+  - [x] Muted by (array of user IDs)
+- [x] Create Messages collection:
+  - [x] Conversation ID (reference)
+  - [x] Sender ID (user ID)
+  - [x] Content (text, media URL, voice URL)
+  - [x] Type (`'text'` | `'photo'` | `'video'` | `'voice'` | `'heart'` | `'comment'` | `'reaction'`)
+  - [x] Quoted content (optional):
+    - [x] Type (`'post'` | `'message'`)
+    - [x] Post reference (if type='post')
+    - [x] Message reference (if type='message') - message ID only (same conversation)
+    - [x] Preview data (text preview, media thumbnail, sender info)
+    - [x] Constraint: Quoted messages must be from the same conversation
+  - [x] Created at (timestamp)
+  - [x] Read receipts (array of user IDs who have read)
+  - [x] Deleted at (timestamp, optional) - for soft delete
+  - [x] Reaction type field (for reaction messages: 'heart', etc.)
+  - [x] Reactions as message type (type='reaction' with quotedContent pointing to target message)
+- [x] Design services layer to handle both DM and group chat operations:
+  - [x] Conversations service (create, get, update, findOrCreateDM, group management)
+  - [x] Messages service (create, get, pagination, mark as read, delete, quoted message validation)
 
 #### Core Messaging Features (DM-first implementation)
 
@@ -232,7 +237,7 @@
       - [ ] Quoted post → Navigate to post detail page
       - [ ] Quoted message → Scroll to original message in conversation
   - [ ] Scroll-to-message functionality (when clicking quoted message)
-  - [ ] Message quoting UI (long-press or quote button on messages)
+  - [ ] Long-press on messages to open MessageContextModal
   - [ ] Mute/unmute conversation toggle
   - [ ] Conditional UI based on conversation type:
     - [ ] DM: Show other user's name/avatar in header
@@ -246,17 +251,38 @@
   - [ ] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
   - [ ] Send comment message with quoted post content
   - [ ] Support sending to group chats (if user is in group with post author)
+- [ ] Build MessageContextModal component:
+  - [ ] Triggered by long-press on any message in conversation
+  - [ ] Shows interaction options based on message state and ownership:
+    - [ ] Heart message (toggle reaction - inline, not a new message)
+    - [ ] Reply to message (quote message)
+    - [ ] Delete message (only for sender's own messages)
+  - [ ] Modal with sharp corners, flat design (consistent with app style)
+  - [ ] [CANCEL] button to close
+- [ ] Implement inline message reactions:
+  - [x] Add 'reaction' as message type
+  - [x] Reaction messages quote target message (quotedContent with empty preview)
+  - [x] Support reaction types (starting with 'heart', extensible for future)
+  - [x] Toggle reactions (create reaction message if not present, delete if present)
+  - [x] Backend functions: toggleMessageReaction, getMessageReactions, getReactionCount, hasUserReacted
+  - [x] Reaction messages don't update conversation lastMessageAt (don't bump to top)
+  - [ ] UI: Display reaction counts and indicators on message bubbles
+  - [ ] UI: Show which users have reacted (optional: tooltip or expandable list)
+  - [ ] UI: Filter out reaction messages from main message list (show as reactions on target messages)
 - [ ] Implement message quoting flow:
-  - [ ] Long-press or quote button on any message in conversation
+  - [ ] Triggered from MessageContextModal "Reply" option
   - [ ] Show quote preview (text, photo thumbnail, voice indicator)
+  - [ ] Pre-fill message input with quoted message reference
   - [ ] Send new message with quoted message reference
   - [ ] Support quoting text, photo, and voice messages
   - [ ] Constraint: Messages can only be quoted within the same conversation
 - [ ] Implement message deletion:
-  - [ ] Soft delete (mark as deleted, don't remove from database)
-  - [ ] Strip all content (text, media, voice, quoted content)
-  - [ ] Show "Deleted message" placeholder in UI
-  - [ ] Only sender can delete their own messages
+  - [x] Backend: Soft delete (mark as deleted, don't remove from database)
+  - [x] Backend: Strip all content (text, media, voice, quoted content)
+  - [x] Backend: Only sender can delete their own messages
+  - [ ] UI: Triggered from MessageContextModal "Delete" option
+  - [ ] UI: Show "Deleted message" placeholder in conversation
+  - [ ] UI: Confirmation modal before deletion
 - [ ] Real-time message updates (Firestore listeners for both types)
 
 #### Group Chat Features
