@@ -75,11 +75,18 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
       <View style={styles.inputRow}>
         <View style={styles.inputWrapper}>
           <TextInput
-            placeholder="Type a message..."
+            placeholder=""
             value={text}
             onChangeText={setText}
             multiline
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.colors.highlightLow,
+                borderWidth: 0,
+                color: theme.colors.text,
+              },
+            ]}
             editable={!disabled}
           />
         </View>
@@ -98,6 +105,7 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
             onPress={handleSend}
             disabled={disabled || (!text.trim() && !quotedContent)}
             style={[styles.sendButton, { opacity: disabled || (!text.trim() && !quotedContent) ? 0.5 : 1 }]}
+            focusable={false}
           >
             <FontAwesome6 name="paper-plane" size={18} color={theme.colors.pine} />
           </Pressable>
