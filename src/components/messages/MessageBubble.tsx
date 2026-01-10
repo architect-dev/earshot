@@ -5,6 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Text, Avatar } from '@/components/ui';
 import { formatTimestamp } from '@/utils/formatting';
 import { type Message } from '@/types';
+import { QuotedContent } from './QuotedContent';
 
 interface MessageBubbleProps {
   message: Message;
@@ -142,7 +143,9 @@ export function MessageBubble({
 
       {/* Quoted content - separate element above bubble */}
       {message.quotedContent && (
-        <Pressable
+        <QuotedContent
+          quotedContent={message.quotedContent}
+          variant="message"
           onPress={() => {
             if (message.quotedContent?.type === 'post' && onQuotedPostPress) {
               onQuotedPostPress(message.quotedContent.postId);
@@ -150,98 +153,9 @@ export function MessageBubble({
               onQuotedMessagePress(message.quotedContent.messageId);
             }
           }}
-          style={[styles.quotedContent, { backgroundColor: theme.colors.highlightMed }]}
-        >
-          {/* Header with avatar and name */}
-          <View style={styles.quotedHeader}>
-            {message.quotedContent.type === 'post' ? (
-              <>
-                <Avatar source={null} name={message.quotedContent.preview.authorName} size="xs" />
-                <Text size="xs" weight="semibold" color="subtle">
-                  {message.quotedContent.preview.authorName}
-                </Text>
-              </>
-            ) : (
-              <>
-                {(() => {
-                  // Try to get the sender profile using messageId to find senderId
-                  let quotedSenderProfile: { fullName: string; profilePhotoUrl: string | null } | null = null;
-                  if (getMessage && getUserProfile && message.quotedContent.type === 'message') {
-                    const quotedMsg = getMessage(message.quotedContent.messageId);
-                    if (quotedMsg) {
-                      quotedSenderProfile = getUserProfile(quotedMsg.senderId);
-                    }
-                  }
-                  const displayName = quotedSenderProfile?.fullName || message.quotedContent.preview.senderName;
-                  const displayAvatar = quotedSenderProfile?.profilePhotoUrl || null;
-                  return (
-                    <>
-                      <Avatar source={displayAvatar} name={displayName} size="xs" />
-                      <Text size="xs" weight="semibold" color="subtle">
-                        {displayName}
-                      </Text>
-                    </>
-                  );
-                })()}
-              </>
-            )}
-          </View>
-
-          {/* Body with content */}
-          <View style={styles.quotedBody}>
-            {message.quotedContent.type === 'post' && (
-              <>
-                {message.quotedContent.preview.mediaUrl && (
-                  <Image
-                    source={{ uri: message.quotedContent.preview.mediaUrl }}
-                    style={styles.quotedImage}
-                    resizeMode="cover"
-                  />
-                )}
-                {message.quotedContent.preview.text && (
-                  <Text size="xs" color="muted" numberOfLines={2}>
-                    {message.quotedContent.preview.text}
-                  </Text>
-                )}
-                {!message.quotedContent.preview.text && !message.quotedContent.preview.mediaUrl && (
-                  <Text size="xs" color="muted">
-                    📷 Photo
-                  </Text>
-                )}
-              </>
-            )}
-            {message.quotedContent.type === 'message' && (
-              <>
-                {message.quotedContent.preview.mediaUrl && (
-                  <Image
-                    source={{ uri: message.quotedContent.preview.mediaUrl }}
-                    style={styles.quotedImage}
-                    resizeMode="cover"
-                  />
-                )}
-                {message.quotedContent.preview.voiceUrl && (
-                  <View style={[styles.quotedImage, { backgroundColor: theme.colors.highlightLow }]}>
-                    <Text size="xs" color="muted">
-                      🎤
-                    </Text>
-                  </View>
-                )}
-                {message.quotedContent.preview.text && (
-                  <Text size="xs" color="muted" numberOfLines={2}>
-                    {message.quotedContent.preview.text}
-                  </Text>
-                )}
-                {!message.quotedContent.preview.text &&
-                  !message.quotedContent.preview.mediaUrl &&
-                  !message.quotedContent.preview.voiceUrl && (
-                    <Text size="xs" color="muted">
-                      Message
-                    </Text>
-                  )}
-              </>
-            )}
-          </View>
-        </Pressable>
+          getUserProfile={getUserProfile}
+          getMessage={getMessage}
+        />
       )}
 
       {/* Message bubble - always highlightLow background */}

@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, Alert } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
-import { TextInput, Text } from '@/components/ui';
+import { TextInput } from '@/components/ui';
 import * as ImagePicker from 'expo-image-picker';
 import { type QuotedContent } from '@/types';
+import { QuotedContent as QuotedContentComponent } from './QuotedContent';
 
 interface MessageInputProps {
   onSend: (content: string, mediaUri?: string) => void;
@@ -50,27 +51,7 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
       style={[styles.container, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.highlightLow }]}
     >
       {/* Quoted content preview */}
-      {quotedContent && (
-        <View style={[styles.quotedPreview, { backgroundColor: theme.colors.highlightLow }]}>
-          <View style={styles.quotedContent}>
-            {quotedContent.type === 'post' && (
-              <Text size="xs" color="muted">
-                Replying to {quotedContent.preview.authorName}: {quotedContent.preview.text || '📷 Photo'}
-              </Text>
-            )}
-            {quotedContent.type === 'message' && (
-              <Text size="xs" color="muted">
-                Replying to {quotedContent.preview.senderName}: {quotedContent.preview.text || 'Message'}
-              </Text>
-            )}
-          </View>
-          {onClearQuote && (
-            <Pressable onPress={onClearQuote} style={styles.clearQuote}>
-              <FontAwesome6 name="xmark" size={14} color={theme.colors.muted} />
-            </Pressable>
-          )}
-        </View>
-      )}
+      {quotedContent && <QuotedContentComponent quotedContent={quotedContent} variant="input" onClear={onClearQuote} />}
 
       <View style={styles.inputRow}>
         <View style={styles.inputWrapper}>
@@ -85,6 +66,8 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
                 backgroundColor: theme.colors.highlightLow,
                 borderWidth: 0,
                 color: theme.colors.text,
+                paddingTop: quotedContent ? 20 : 12,
+                marginTop: quotedContent ? -8 : 0,
               },
             ]}
             editable={!disabled}
@@ -120,20 +103,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingBottom: 24,
     paddingTop: 8,
-  },
-  quotedPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-  quotedContent: {
-    flex: 1,
-  },
-  clearQuote: {
-    padding: 4,
-    marginLeft: 8,
   },
   inputRow: {
     flexDirection: 'row',
