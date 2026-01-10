@@ -45,7 +45,7 @@ export function Avatar({ source, name, size = 'md', style }: AvatarProps) {
   const containerStyle: ViewStyle = {
     width: dimension,
     height: dimension,
-    backgroundColor: theme.colors.highlightMed,
+    backgroundColor: theme.colors.highlightHigh,
   };
 
   // If no source, show grey square (or initials if name provided)

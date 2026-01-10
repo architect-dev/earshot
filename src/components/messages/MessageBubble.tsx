@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Pressable, StyleSheet, Image } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor } from 'react-native-reanimated';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text, Avatar } from '@/components/ui';
 import { formatTimestamp } from '@/utils/formatting';
@@ -12,7 +13,12 @@ interface MessageBubbleProps {
   senderAvatar?: string | null; // For group chats
   onPress?: () => void;
   onLongPress?: () => void;
+  onQuotedPostPress?: (postId: string) => void;
+  onQuotedMessagePress?: (messageId: string) => void;
+  getUserProfile?: (userId: string) => { fullName: string; profilePhotoUrl: string | null } | null; // For quoted message avatars
+  getMessage?: (messageId: string) => Message | null; // To get senderId from quoted message
   opacity?: number; // For pending messages (0.5)
+  isHighlighted?: boolean; // For flash effect when scrolling to message
 }
 
 export function MessageBubble({
@@ -22,9 +28,42 @@ export function MessageBubble({
   senderAvatar,
   onPress,
   onLongPress,
+  onQuotedPostPress,
+  onQuotedMessagePress,
+  getUserProfile,
+  getMessage,
   opacity = 1,
+  isHighlighted = false,
 }: MessageBubbleProps) {
   const { theme } = useTheme();
+  const highlightProgress = useSharedValue(0);
+  const hasQuotedContent = !!message.quotedContent;
+
+  // Animate highlight when isHighlighted changes
+  useEffect(() => {
+    if (isHighlighted) {
+      highlightProgress.value = withTiming(1, { duration: 300 });
+      // Auto-fade out after 2 seconds
+      const timeout = setTimeout(() => {
+        highlightProgress.value = withTiming(0, { duration: 500 });
+      }, 2000);
+      return () => clearTimeout(timeout);
+    } else {
+      highlightProgress.value = withTiming(0, { duration: 500 });
+    }
+  }, [isHighlighted, highlightProgress]);
+
+  // Animated background color (always highlightLow, animate to highlightHigh when highlighted)
+  const animatedBackgroundStyle = useAnimatedStyle(() => {
+    const baseColor = theme.colors.highlightLow;
+    const highlightColor = theme.colors.highlightHigh;
+
+    const backgroundColor = interpolateColor(highlightProgress.value, [0, 1], [baseColor, highlightColor]);
+
+    return {
+      backgroundColor,
+    };
+  });
 
   // Don't render reaction messages (they're handled separately)
   if (message.type === 'reaction') {
@@ -101,31 +140,114 @@ export function MessageBubble({
         </View>
       )}
 
-      <View
-        style={[
-          styles.bubble,
-          isOwn
-            ? [styles.ownBubble, { backgroundColor: theme.colors.highlightLow }]
-            : [styles.otherBubble, { backgroundColor: theme.colors.highlightMed }],
-          { opacity },
-        ]}
-      >
-        {/* Quoted content */}
-        {message.quotedContent && (
-          <View style={[styles.quotedContent, { borderLeftColor: theme.colors.gold }]}>
-            {message.quotedContent.type === 'post' && (
-              <Text size="xs" color="muted">
-                {message.quotedContent.preview.authorName}: {message.quotedContent.preview.text || '📷 Photo'}
-              </Text>
-            )}
-            {message.quotedContent.type === 'message' && (
-              <Text size="xs" color="muted">
-                {message.quotedContent.preview.senderName}: {message.quotedContent.preview.text || 'Message'}
-              </Text>
+      {/* Quoted content - separate element above bubble */}
+      {message.quotedContent && (
+        <Pressable
+          onPress={() => {
+            if (message.quotedContent?.type === 'post' && onQuotedPostPress) {
+              onQuotedPostPress(message.quotedContent.postId);
+            } else if (message.quotedContent?.type === 'message' && onQuotedMessagePress) {
+              onQuotedMessagePress(message.quotedContent.messageId);
+            }
+          }}
+          style={[styles.quotedContent, { backgroundColor: theme.colors.highlightMed }]}
+        >
+          {/* Header with avatar and name */}
+          <View style={styles.quotedHeader}>
+            {message.quotedContent.type === 'post' ? (
+              <>
+                <Avatar source={null} name={message.quotedContent.preview.authorName} size="xs" />
+                <Text size="xs" weight="semibold" color="subtle">
+                  {message.quotedContent.preview.authorName}
+                </Text>
+              </>
+            ) : (
+              <>
+                {(() => {
+                  // Try to get the sender profile using messageId to find senderId
+                  let quotedSenderProfile: { fullName: string; profilePhotoUrl: string | null } | null = null;
+                  if (getMessage && getUserProfile && message.quotedContent.type === 'message') {
+                    const quotedMsg = getMessage(message.quotedContent.messageId);
+                    if (quotedMsg) {
+                      quotedSenderProfile = getUserProfile(quotedMsg.senderId);
+                    }
+                  }
+                  const displayName = quotedSenderProfile?.fullName || message.quotedContent.preview.senderName;
+                  const displayAvatar = quotedSenderProfile?.profilePhotoUrl || null;
+                  return (
+                    <>
+                      <Avatar source={displayAvatar} name={displayName} size="xs" />
+                      <Text size="xs" weight="semibold" color="subtle">
+                        {displayName}
+                      </Text>
+                    </>
+                  );
+                })()}
+              </>
             )}
           </View>
-        )}
 
+          {/* Body with content */}
+          <View style={styles.quotedBody}>
+            {message.quotedContent.type === 'post' && (
+              <>
+                {message.quotedContent.preview.mediaUrl && (
+                  <Image
+                    source={{ uri: message.quotedContent.preview.mediaUrl }}
+                    style={styles.quotedImage}
+                    resizeMode="cover"
+                  />
+                )}
+                {message.quotedContent.preview.text && (
+                  <Text size="xs" color="muted" numberOfLines={2}>
+                    {message.quotedContent.preview.text}
+                  </Text>
+                )}
+                {!message.quotedContent.preview.text && !message.quotedContent.preview.mediaUrl && (
+                  <Text size="xs" color="muted">
+                    📷 Photo
+                  </Text>
+                )}
+              </>
+            )}
+            {message.quotedContent.type === 'message' && (
+              <>
+                {message.quotedContent.preview.mediaUrl && (
+                  <Image
+                    source={{ uri: message.quotedContent.preview.mediaUrl }}
+                    style={styles.quotedImage}
+                    resizeMode="cover"
+                  />
+                )}
+                {message.quotedContent.preview.voiceUrl && (
+                  <View style={[styles.quotedImage, { backgroundColor: theme.colors.highlightLow }]}>
+                    <Text size="xs" color="muted">
+                      🎤
+                    </Text>
+                  </View>
+                )}
+                {message.quotedContent.preview.text && (
+                  <Text size="xs" color="muted" numberOfLines={2}>
+                    {message.quotedContent.preview.text}
+                  </Text>
+                )}
+                {!message.quotedContent.preview.text &&
+                  !message.quotedContent.preview.mediaUrl &&
+                  !message.quotedContent.preview.voiceUrl && (
+                    <Text size="xs" color="muted">
+                      Message
+                    </Text>
+                  )}
+              </>
+            )}
+          </View>
+        </Pressable>
+      )}
+
+      {/* Message bubble - always highlightLow background */}
+      <Animated.View
+        style={[styles.bubble, { opacity }, animatedBackgroundStyle, hasQuotedContent && styles.bubbleWithQuote]}
+      >
         {/* Main content */}
         {renderContent()}
 
@@ -140,7 +262,7 @@ export function MessageBubble({
             </Text>
           )}
         </View>
-      </View>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -170,6 +292,10 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 0, // Sharp corners
   },
+  bubbleWithQuote: {
+    paddingTop: 16, // Additional top padding when quoted
+    marginTop: -8, // Overlap with quoted content
+  },
   ownBubble: {},
   otherBubble: {},
   media: {
@@ -182,10 +308,31 @@ const styles = StyleSheet.create({
     borderRadius: 0,
   },
   quotedContent: {
-    paddingLeft: 8,
-    borderLeftWidth: 3,
-    marginBottom: 8,
-    paddingBottom: 4,
+    maxWidth: '80%', // 80% of screen width
+    padding: 8,
+    marginBottom: 0, // No margin, will overlap with bubble
+    borderRadius: 0,
+    zIndex: 1, // Overlay the message bubble
+  },
+  quotedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  quotedAvatar: {
+    width: 16,
+    height: 16,
+  },
+  quotedBody: {
+    gap: 4,
+  },
+  quotedImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   footer: {
     flexDirection: 'row',

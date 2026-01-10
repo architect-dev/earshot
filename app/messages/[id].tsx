@@ -77,6 +77,7 @@ export default function ConversationScreen() {
   const [quotedContent, setQuotedContent] = useState<QuotedContent | null>(null);
   const [contextModalVisible, setContextModalVisible] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
   // Store cursor and user profiles for pagination and display
   const cursorRef = useRef<DocumentSnapshot | null>(null);
@@ -210,6 +211,14 @@ export default function ConversationScreen() {
     return userProfilesRef.current.get(userId) || null;
   }, []);
 
+  // Get message by ID (for quoted content lookup)
+  const getMessageById = useCallback(
+    (messageId: string): Message | null => {
+      return messages.find((msg) => msg.id === messageId) || null;
+    },
+    [messages]
+  );
+
   // Combine messages and pending messages for display
   // Messages are already sorted newest first (from getConversationMessages)
   // We'll add pending messages at the beginning (newest)
@@ -278,13 +287,13 @@ export default function ConversationScreen() {
 
   const handleMessageReply = useCallback(
     (message: Message) => {
-      // Create quoted content from message
+      // Create quoted content from message - always use real profile
       const senderProfile = getUserProfile(message.senderId);
       const quoted: QuotedContent = {
         type: 'message',
         messageId: message.id,
         preview: {
-          senderName: message.senderId === user?.uid ? 'You' : senderProfile?.fullName || 'Unknown',
+          senderName: senderProfile?.fullName || 'Unknown',
           senderUsername: senderProfile?.username || '',
           text: message.content || undefined,
           mediaUrl: message.mediaUrl || undefined,
@@ -292,13 +301,51 @@ export default function ConversationScreen() {
       };
       setQuotedContent(quoted);
     },
-    [user, getUserProfile]
+    [getUserProfile]
   );
 
   const handleMessageDelete = useCallback(() => {
     // Refresh messages list to show deleted state
     loadConversation();
   }, [loadConversation]);
+
+  // Handle quoted message press - scroll to message and highlight
+  const handleQuotedMessagePress = useCallback(
+    (messageId: string) => {
+      // Find the message in the display messages (includes pending)
+      const allMessages = displayMessages;
+      const messageIndex = allMessages.findIndex((msg) => {
+        // Check if it's a Message (has id) or PendingMessage (has tempId)
+        return 'id' in msg ? msg.id === messageId : false;
+      });
+      if (messageIndex !== -1 && flatListRef.current) {
+        // FlatList is inverted, so we need to scroll to the correct index
+        // In inverted lists, index 0 is at the bottom
+        try {
+          // Set highlighted message before scrolling
+          setHighlightedMessageId(messageId);
+          flatListRef.current.scrollToIndex({ index: messageIndex, animated: true, viewPosition: 0.5 });
+          // Clear highlight after animation completes (2 seconds)
+          setTimeout(() => {
+            setHighlightedMessageId(null);
+          }, 2000);
+        } catch (err) {
+          // If scroll fails (e.g., item not rendered), try scrolling to offset
+          // eslint-disable-next-line no-console
+          console.warn('Failed to scroll to message index:', err);
+          // Still set highlight even if scroll fails
+          setHighlightedMessageId(messageId);
+          setTimeout(() => {
+            setHighlightedMessageId(null);
+          }, 2000);
+        }
+      } else {
+        // Message not loaded yet - TODO: Implement fetch with context and scroll
+        Alert.alert('Message', 'Message not loaded. Scroll-to-message with context fetching not yet implemented.');
+      }
+    },
+    [displayMessages]
+  );
 
   if (loading) {
     return (
@@ -355,6 +402,9 @@ export default function ConversationScreen() {
             senderAvatar = senderProfile?.profilePhotoUrl;
           }
 
+          const messageId = 'id' in item ? item.id : item.tempId;
+          const isHighlighted = highlightedMessageId === messageId;
+
           return (
             <MessageBubble
               message={item as Message}
@@ -362,7 +412,11 @@ export default function ConversationScreen() {
               senderName={senderName}
               senderAvatar={senderAvatar}
               opacity={opacity}
+              isHighlighted={isHighlighted}
+              getUserProfile={getUserProfile}
+              getMessage={getMessageById}
               onLongPress={() => handleMessageLongPress(item as Message)}
+              onQuotedMessagePress={handleQuotedMessagePress}
             />
           );
         }}
