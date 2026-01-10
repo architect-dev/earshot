@@ -29,6 +29,9 @@ export default function FeedScreen() {
 
   // Store cursor for pagination
   const cursorRef = useRef<DocumentSnapshot | null>(null);
+  // Track the feedUserIds that were used for the cursor
+  // If feedUserIds changes, the cursor is invalid and must be reset
+  const cursorFeedUserIdsRef = useRef<string[]>([]);
 
   // Post options state
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
@@ -51,6 +54,15 @@ export default function FeedScreen() {
         // Include own posts in feed (friendIds + current user)
         const feedUserIds = [...friendIds, user.uid];
 
+        // Reset cursor if feedUserIds changed (cursor is query-specific)
+        // Compare arrays by sorting and stringifying to check if they're the same
+        const currentIds = [...feedUserIds].sort().join(',');
+        const cursorIds = [...cursorFeedUserIdsRef.current].sort().join(',');
+        if (currentIds !== cursorIds) {
+          cursorRef.current = null;
+          cursorFeedUserIdsRef.current = feedUserIds;
+        }
+
         // Reset cursor on refresh
         if (isRefresh) {
           cursorRef.current = null;
@@ -60,6 +72,7 @@ export default function FeedScreen() {
         const result = await getFeedPosts(feedUserIds, PAGE_SIZE, cursorRef.current);
         setPosts(result.posts);
         cursorRef.current = result.cursor;
+        cursorFeedUserIdsRef.current = feedUserIds; // Update tracked IDs
         setHasMore(result.hasMore);
       } catch (err) {
         // eslint-disable-next-line no-console
@@ -78,9 +91,20 @@ export default function FeedScreen() {
     try {
       // Include own posts in feed (friendIds + current user)
       const feedUserIds = [...friendIds, user.uid];
+
+      // Verify cursor is still valid for current feedUserIds
+      const currentIds = [...feedUserIds].sort().join(',');
+      const cursorIds = [...cursorFeedUserIdsRef.current].sort().join(',');
+      if (currentIds !== cursorIds) {
+        // Feed user IDs changed, can't use old cursor
+        setLoadingMore(false);
+        return;
+      }
+
       const result = await getFeedPosts(feedUserIds, PAGE_SIZE, cursorRef.current);
       setPosts((prev) => [...prev, ...result.posts]);
       cursorRef.current = result.cursor;
+      cursorFeedUserIdsRef.current = feedUserIds; // Update tracked IDs
       setHasMore(result.hasMore);
     } catch (err) {
       // eslint-disable-next-line no-console
