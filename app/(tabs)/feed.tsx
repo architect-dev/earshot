@@ -8,8 +8,10 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getFeedPosts, deletePost } from '@/services/posts';
 import { getFriends } from '@/services/friends';
+import { findOrCreateDM } from '@/services/conversations';
+import { createMessage } from '@/services/messages';
 import { getErrorMessage } from '@/utils/errors';
-import { type PostWithAuthor } from '@/types';
+import { type PostWithAuthor, type QuotedContent } from '@/types';
 
 const PAGE_SIZE = 20;
 
@@ -112,21 +114,37 @@ export default function FeedScreen() {
     setShowInteractionModal(true);
   };
 
-  const handleSendInteraction = async (_message: string) => {
+  const handleSendInteraction = async (conversationId: string, messageType: 'heart' | 'comment', content: string | undefined) => {
     if (!interactionPost || !user) return;
 
     setSendingInteraction(true);
     try {
-      // TODO: Implement actual DM sending in Phase 5
-      // await sendDirectMessage(user.uid, interactionPost.authorId, _message, { postId: interactionPost.id });
+      // Create quoted content for the post
+      const quotedContent: QuotedContent = {
+        type: 'post',
+        postId: interactionPost.id,
+        preview: {
+          authorName: interactionPost.author.fullName,
+          authorUsername: interactionPost.author.username,
+          text: interactionPost.textBody || undefined,
+          mediaUrl: interactionPost.media.length > 0 ? interactionPost.media[0].url : undefined,
+        },
+      };
+
+      // Send message with quoted post
+      await createMessage({
+        conversationId,
+        senderId: user.uid,
+        type: messageType === 'heart' ? 'heart' : 'comment',
+        content: messageType === 'heart' ? undefined : content,
+        quotedContent,
+      });
 
       setShowInteractionModal(false);
       setInteractionPost(null);
-
-      const actionType = interactionType === 'heart' ? 'Heart' : 'Comment';
-      Alert.alert('Sent!', `${actionType} sent to ${interactionPost.author.fullName}`);
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
+      throw err; // Re-throw so modal can handle it
     } finally {
       setSendingInteraction(false);
     }

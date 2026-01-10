@@ -146,6 +146,9 @@ export function MessageBubble({
         <QuotedContent
           quotedContent={message.quotedContent}
           variant="message"
+          postReplyType={
+            message.quotedContent.type === 'post' ? (message.type === 'heart' ? 'heart' : 'comment') : undefined
+          }
           onPress={() => {
             if (message.quotedContent?.type === 'post' && onQuotedPostPress) {
               onQuotedPostPress(message.quotedContent.postId);

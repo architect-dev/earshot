@@ -24,6 +24,16 @@ export const rosePine = {
   highlightLow: '#21202e',
   highlightMed: '#403d52',
   highlightHigh: '#524f67',
+
+  // Love highlight colors (brighter, less grey, more love/pink tint)
+  loveLow: '#2f1f26',
+  loveMed: '#4f2d3a',
+  loveHigh: '#6f3d50',
+
+  // Pine highlight colors (brighter, less grey, more pine tint)
+  pineLow: '#1f252b',
+  pineMed: '#2c3845',
+  pineHigh: '#3a4b5f',
 } as const;
 
 export const rosePineDawn = {
@@ -47,6 +57,16 @@ export const rosePineDawn = {
   highlightLow: '#f4ede8',
   highlightMed: '#dfdad9',
   highlightHigh: '#cecacd',
+
+  // Love highlight colors (brighter, less grey, more love/pink tint)
+  loveLow: '#f9eceb',
+  loveMed: '#f3d9d9',
+  loveHigh: '#edc6c7',
+
+  // Pine highlight colors (brighter, less grey, more pine tint)
+  pineLow: '#f0f5f6',
+  pineMed: '#e1ebed',
+  pineHigh: '#d2e1e4',
 } as const;
 
 export interface ColorPalette {
@@ -65,4 +85,10 @@ export interface ColorPalette {
   highlightLow: string;
   highlightMed: string;
   highlightHigh: string;
+  loveLow: string;
+  loveMed: string;
+  loveHigh: string;
+  pineLow: string;
+  pineMed: string;
+  pineHigh: string;
 }

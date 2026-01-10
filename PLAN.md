@@ -244,14 +244,20 @@
   - [x] Pending messages (50% opacity until confirmed sent)
   - [x] Read receipts (delivered/read)
   - [ ] Typing indicators (see details below)
-  - [ ] Quoted content display:
-    - [ ] Support quoted posts (from PostInteractionModal)
-    - [ ] Support quoted messages (text, photo, voice)
-    - [ ] Clickable quoted content:
-      - [ ] Quoted post → Navigate to post detail page
-      - [ ] Quoted message → Scroll to original message in conversation (see details below)
-  - [ ] Scroll-to-message functionality (when clicking quoted message - see details below)
-  - [ ] Long-press on messages to open MessageContextModal
+  - [x] Quoted content display:
+    - [x] Support quoted posts (from PostInteractionModal)
+    - [x] Support quoted messages (text, photo, voice)
+    - [x] Clickable quoted content:
+      - [x] Quoted post → Navigate to post detail page (handler ready, page not yet built)
+      - [x] Quoted message → Scroll to original message in conversation (see details below)
+    - [x] Extract QuotedContent component for reuse (message, input, modal variants)
+  - [x] Scroll-to-message functionality (when clicking quoted message - basic implementation):
+    - [x] Scroll to target message using FlatList.scrollToIndex()
+    - [x] Highlight target message briefly (fade animation to highlightHigh)
+    - [ ] If not loaded, fetch message with context (10 messages before/after) - TODO
+    - [ ] Merge context messages into existing list - TODO
+    - [ ] Handle edge cases: deleted quoted message, network failure, very old messages - TODO
+  - [x] Long-press on messages to open MessageContextModal
   - [ ] Mute/unmute conversation toggle
   - [x] Conditional UI based on conversation type:
     - [x] DM: Show other user's name/avatar in header
@@ -265,14 +271,14 @@
   - [ ] Use `findOrCreateDM()` to ensure DM exists (lazy creation)
   - [ ] Send comment message with quoted post content
   - [ ] Support sending to group chats (if user is in group with post author)
-- [ ] Build MessageContextModal component:
-  - [ ] Triggered by long-press on any message in conversation
-  - [ ] Shows interaction options based on message state and ownership:
-    - [ ] Heart message (toggle reaction - inline, not a new message)
-    - [ ] Reply to message (quote message)
-    - [ ] Delete message (only for sender's own messages)
-  - [ ] Modal with sharp corners, flat design (consistent with app style)
-  - [ ] [CANCEL] button to close
+- [x] Build MessageContextModal component:
+  - [x] Triggered by long-press on any message in conversation
+  - [x] Shows interaction options based on message state and ownership:
+    - [x] Heart message (toggle reaction - inline, not a new message)
+    - [x] Reply to message (quote message)
+    - [x] Delete message (only for sender's own messages)
+  - [x] Modal with sharp corners, flat design (consistent with app style)
+  - [x] [CANCEL] button to close
 - [ ] Implement inline message reactions:
   - [x] Add 'reaction' as message type
   - [x] Reaction messages quote target message (quotedContent with empty preview)
@@ -283,20 +289,20 @@
   - [ ] UI: Display reaction counts and indicators on message bubbles
   - [ ] UI: Show which users have reacted (optional: tooltip or expandable list)
   - [ ] UI: Filter out reaction messages from main message list (show as reactions on target messages)
-- [ ] Implement message quoting flow:
-  - [ ] Triggered from MessageContextModal "Reply" option
-  - [ ] Show quote preview (text, photo thumbnail, voice indicator)
-  - [ ] Pre-fill message input with quoted message reference
-  - [ ] Send new message with quoted message reference
-  - [ ] Support quoting text, photo, and voice messages
-  - [ ] Constraint: Messages can only be quoted within the same conversation
-- [ ] Implement message deletion:
+- [x] Implement message quoting flow:
+  - [x] Triggered from MessageContextModal "Reply" option
+  - [x] Show quote preview (text, photo thumbnail, voice indicator) in MessageInput
+  - [x] Pre-fill message input with quoted message reference
+  - [x] Send new message with quoted message reference
+  - [x] Support quoting text, photo, and voice messages
+  - [x] Constraint: Messages can only be quoted within the same conversation
+- [x] Implement message deletion:
   - [x] Backend: Soft delete (mark as deleted, don't remove from database)
   - [x] Backend: Strip all content (text, media, voice, quoted content)
   - [x] Backend: Only sender can delete their own messages
-  - [ ] UI: Triggered from MessageContextModal "Delete" option
-  - [ ] UI: Show "Deleted message" placeholder in conversation
-  - [ ] UI: Confirmation modal before deletion
+  - [x] UI: Triggered from MessageContextModal "Delete" option
+  - [x] UI: Show "Deleted message" placeholder in conversation
+  - [ ] UI: Confirmation modal before deletion - TODO
 - [x] Real-time message updates (Firestore listeners for both types)
 - [x] Infinite scroll pagination for conversations:
   - [x] Load initial batch (50 messages, reverse chronological)
@@ -311,13 +317,13 @@
   - [x] Handle send failures (mark as failed, allow retry)
   - [x] Prevent duplicate messages when real message arrives
   - [ ] Handle race conditions (real message arrives before pending is added)
-- [ ] Scroll-to-message functionality:
-  - [ ] When quoted message is clicked, check if message is loaded
-  - [ ] If not loaded, fetch message with context (10 messages before/after)
-  - [ ] Merge context messages into existing list
-  - [ ] Scroll to target message using FlatList.scrollToItem()
-  - [ ] Highlight target message briefly (fade animation)
-  - [ ] Handle edge cases: deleted quoted message, network failure, very old messages
+- [x] Scroll-to-message functionality (basic implementation):
+  - [x] When quoted message is clicked, check if message is loaded
+  - [x] Scroll to target message using FlatList.scrollToIndex()
+  - [x] Highlight target message briefly (fade animation to highlightHigh)
+  - [ ] If not loaded, fetch message with context (10 messages before/after) - TODO
+  - [ ] Merge context messages into existing list - TODO
+  - [ ] Handle edge cases: deleted quoted message, network failure, very old messages - TODO
 - [ ] Typing indicators:
   - [ ] Update typing state on text input (debounced, 500ms)
   - [ ] Clear typing state on message send or input blur
@@ -588,15 +594,15 @@ earshot/
 - [ ] View feed
 - [ ] Heart a post
 - [ ] Comment on a post
-- [ ] Send text message
-- [ ] Send photo in DM
-- [ ] Send voice message
-- [ ] Quote a message in conversation (text, photo, voice)
-- [ ] Click quoted message → scrolls to original message
-- [ ] Click quoted post → opens post detail page
-- [ ] View post detail page (from quoted content)
-- [ ] Mute/unmute conversation
-- [ ] Read receipts working
+  - [x] Send text message
+  - [x] Send photo in DM
+  - [ ] Send voice message
+  - [x] Quote a message in conversation (text, photo, voice)
+  - [x] Click quoted message → scrolls to original message (with highlight animation)
+  - [ ] Click quoted post → opens post detail page (handler ready, page not yet built)
+  - [ ] View post detail page (from quoted content)
+  - [ ] Mute/unmute conversation
+  - [x] Read receipts working
 - [ ] Create group chat (all participants are mutual friends)
 - [ ] Send message to group chat
 - [ ] Heart/comment post with group chat selection (choose between DM and group chat)

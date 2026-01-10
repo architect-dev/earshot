@@ -10,6 +10,7 @@ export type QuotedContentVariant = 'message' | 'input' | 'modal';
 interface QuotedContentProps {
   quotedContent: QuotedContent;
   variant?: QuotedContentVariant; // 'message' for message bubbles, 'input' for input preview, 'modal' for modals
+  postReplyType?: 'comment' | 'heart';
   onPress?: () => void; // For message bubbles - navigate to quoted content
   onClear?: () => void; // For input - clear the quote
   getUserProfile?: (userId: string) => { fullName: string; profilePhotoUrl: string | null } | null; // For quoted message avatars
@@ -19,6 +20,7 @@ interface QuotedContentProps {
 export function QuotedContent({
   quotedContent,
   variant = 'message',
+  postReplyType,
   onPress,
   onClear,
   getUserProfile,
@@ -52,18 +54,37 @@ export function QuotedContent({
         ? [styles.modalContainer]
         : [styles.messageContainer];
 
+  const postContainerStyle =
+    postReplyType === 'heart'
+      ? { backgroundColor: theme.colors.loveMed }
+      : postReplyType === 'comment'
+        ? { backgroundColor: theme.colors.pineMed }
+        : { backgroundColor: theme.colors.highlightMed };
+
   const Component = onPress ? Pressable : View;
 
   return (
-    <Component
-      style={[styles.container, containerStyle, { backgroundColor: theme.colors.highlightMed }]}
-      onPress={onPress}
-    >
+    <Component style={[styles.container, containerStyle, postContainerStyle]} onPress={onPress}>
       {/* Header with avatar and name */}
       <View style={styles.header}>
+        {quotedContent.type === 'post' && (
+          <>
+            {postReplyType === 'heart' && (
+              <View style={[styles.iconContainer, { backgroundColor: theme.colors.love }]}>
+                <FontAwesome6 name="heart" size={14} color={theme.colors.base} solid />
+              </View>
+            )}
+            {postReplyType === 'comment' && (
+              <View style={[styles.iconContainer, { backgroundColor: theme.colors.pine }]}>
+                <FontAwesome6 name="message" size={14} color={theme.colors.base} solid />
+              </View>
+            )}
+          </>
+        )}
         <Avatar source={displayAvatar} name={displayName} size="xs" />
         <Text size="xs" weight="semibold" color="subtle">
           {displayName}
+          {quotedContent.type === 'post' && `'s Post`}
         </Text>
         {onClear && (
           <Pressable onPress={onClear} style={styles.clearButton} hitSlop={8}>
@@ -134,16 +155,19 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     marginRight: 'auto',
   },
-  modalContainer: {
-    borderWidth: 1,
-    padding: 12,
-  },
+  modalContainer: {},
   header: {
     height: 24,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginBottom: 4,
+  },
+  iconContainer: {
+    width: 32,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   body: {
     gap: 4,
