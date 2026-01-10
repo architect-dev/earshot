@@ -252,7 +252,7 @@ export function PostInteractionModal({ visible, onClose, onSend, post, type, loa
         {isHeartMode && (
           <View style={styles.heartBubbleContainer}>
             <View style={[styles.heartBubble, { backgroundColor: theme.colors.loveLow }]}>
-              <FontAwesome6 name="heart" size={16} color={theme.colors.love} solid />
+              <FontAwesome6 name="heart" size={20} color={theme.colors.love} solid />
             </View>
           </View>
         )}

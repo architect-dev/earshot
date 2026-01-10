@@ -3,9 +3,9 @@ import { View, Pressable, StyleSheet, Image } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor } from 'react-native-reanimated';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text, Avatar } from '@/components/ui';
-import { formatTimestamp } from '@/utils/formatting';
 import { type Message } from '@/types';
 import { QuotedContent } from './QuotedContent';
+import { FontAwesome6 } from '@expo/vector-icons';
 
 interface MessageBubbleProps {
   message: Message;
@@ -39,6 +39,8 @@ export function MessageBubble({
   const { theme } = useTheme();
   const highlightProgress = useSharedValue(0);
   const hasQuotedContent = !!message.quotedContent;
+  const isHeartOnPost = message.quotedContent?.type === 'post' && message.type === 'heart';
+  const isCommentOnPost = message.quotedContent?.type === 'post' && message.type === 'comment';
 
   // Animate highlight when isHighlighted changes
   useEffect(() => {
@@ -56,8 +58,16 @@ export function MessageBubble({
 
   // Animated background color (always highlightLow, animate to highlightHigh when highlighted)
   const animatedBackgroundStyle = useAnimatedStyle(() => {
-    const baseColor = theme.colors.highlightLow;
-    const highlightColor = theme.colors.highlightHigh;
+    const baseColor = isCommentOnPost
+      ? theme.colors.pineLow
+      : isHeartOnPost
+        ? theme.colors.loveLow
+        : theme.colors.highlightLow;
+    const highlightColor = isCommentOnPost
+      ? theme.colors.pineMed
+      : isHeartOnPost
+        ? theme.colors.loveMed
+        : theme.colors.highlightHigh;
 
     const backgroundColor = interpolateColor(highlightProgress.value, [0, 1], [baseColor, highlightColor]);
 
@@ -115,7 +125,7 @@ export function MessageBubble({
           </View>
         );
       case 'heart':
-        return <Text size="lg">❤️</Text>;
+        return <FontAwesome6 name="heart" size={20} color={theme.colors.love} solid />;
       case 'comment':
         return <Text size="sm">{message.content}</Text>;
       default:
@@ -163,13 +173,19 @@ export function MessageBubble({
 
       {/* Message bubble - always highlightLow background */}
       <Animated.View
-        style={[styles.bubble, { opacity }, animatedBackgroundStyle, hasQuotedContent && styles.bubbleWithQuote]}
+        style={[
+          styles.bubble,
+          { opacity },
+          isHeartOnPost && styles.heartOnPostBubble,
+          animatedBackgroundStyle,
+          hasQuotedContent && styles.bubbleWithQuote,
+        ]}
       >
         {/* Main content */}
         {renderContent()}
 
         {/* Timestamp and read receipt */}
-        <View style={styles.footer}>
+        {/* <View style={styles.footer}>
           <Text size="xs" color={isOwn ? 'foam' : 'muted'}>
             {formatTimestamp(message.createdAt)}
           </Text>
@@ -178,7 +194,7 @@ export function MessageBubble({
               ✓✓
             </Text>
           )}
-        </View>
+        </View> */}
       </Animated.View>
     </Pressable>
   );
@@ -215,6 +231,9 @@ const styles = StyleSheet.create({
   },
   ownBubble: {},
   otherBubble: {},
+  heartOnPostBubble: {
+    paddingHorizontal: 24,
+  },
   media: {
     width: 200,
     height: 200,
