@@ -9,24 +9,23 @@ import { PostCard } from '@/components/posts';
 import { PostInteractionModal } from '@/components/posts/PostInteractionModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFriends } from '@/contexts/FriendsContext';
 import { getUserPosts } from '@/services/posts';
 import { findOrCreateDM } from '@/services/conversations';
 import { createMessage as createMessageService } from '@/services/messages';
-import { getDocument } from '@/services/firebase/firestore';
-import { COLLECTIONS } from '@/services/firebase/firestore';
 import { getErrorMessage } from '@/utils/errors';
-import { type PostWithAuthor, type User, type QuotedContent } from '@/types';
+import { type PostWithAuthor, type QuotedContent } from '@/types';
 
 const PAGE_SIZE = 20;
 
 export default function UserFeedScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { getFriendById } = useFriends();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const [userProfile, setUserProfile] = useState<User | null>(null);
   const [posts, setPosts] = useState<PostWithAuthor[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -39,22 +38,24 @@ export default function UserFeedScreen() {
   const [showNonOwnerModal, setShowNonOwnerModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
 
+  // Get user profile from FriendsContext
+  const userProfile = id ? getFriendById(id)?.user : undefined;
+
   const loadUserAndPosts = useCallback(async () => {
     if (!id) return;
 
-    try {
-      // Load user profile
-      const profile = await getDocument<User>(COLLECTIONS.USERS, id);
-      if (!profile) {
-        Alert.alert('Error', 'User not found');
-        router.back();
-        return;
-      }
-      setUserProfile(profile);
+    // Check if user is in FriendsContext (all users are friends)
+    const friend = getFriendById(id);
+    if (!friend) {
+      Alert.alert('Error', 'User not found');
+      router.back();
+      return;
+    }
 
+    try {
       // Load initial posts
       const result = await getUserPosts(id, PAGE_SIZE);
-      setPosts(result.posts.map((p) => ({ ...p, author: profile })));
+      setPosts(result.posts.map((p) => ({ ...p, author: friend.user })));
       cursorRef.current = result.cursor;
       setHasMore(result.hasMore);
     } catch (err) {
@@ -63,7 +64,7 @@ export default function UserFeedScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, router]);
+  }, [id, router, getFriendById]);
 
   useEffect(() => {
     loadUserAndPosts();
@@ -72,10 +73,13 @@ export default function UserFeedScreen() {
   const loadMorePosts = useCallback(async () => {
     if (!id || loadingMore || !hasMore || !cursorRef.current) return;
 
+    const friend = getFriendById(id);
+    if (!friend) return;
+
     setLoadingMore(true);
     try {
       const result = await getUserPosts(id, PAGE_SIZE, cursorRef.current);
-      const postsWithAuthor = result.posts.map((p) => ({ ...p, author: userProfile! }));
+      const postsWithAuthor = result.posts.map((p) => ({ ...p, author: friend.user }));
       setPosts((prev) => [...prev, ...postsWithAuthor]);
       cursorRef.current = result.cursor;
       setHasMore(result.hasMore);
@@ -85,7 +89,7 @@ export default function UserFeedScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [id, loadingMore, hasMore, userProfile]);
+  }, [id, loadingMore, hasMore, getFriendById]);
 
   const handleHeartPress = (post: PostWithAuthor) => {
     setInteractionPost(post);

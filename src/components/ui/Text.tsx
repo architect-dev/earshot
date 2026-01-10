@@ -9,7 +9,7 @@ export type FontWeight = keyof typeof fontWeights;
 interface TextProps extends RNTextProps {
   size?: FontSize;
   weight?: FontWeight;
-  color?: 'text' | 'subtle' | 'muted' | 'love' | 'pine' | 'gold' | 'iris' | 'foam' | 'rose';
+  color?: 'base' | 'text' | 'subtle' | 'muted' | 'love' | 'pine' | 'gold' | 'iris' | 'foam' | 'rose';
   align?: 'left' | 'center' | 'right';
 }
 

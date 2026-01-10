@@ -12,7 +12,7 @@ import {
   type DocumentSnapshot,
 } from './firebase/firestore';
 import { uploadFile, deleteFile, getPostMediaPath } from './firebase/storage';
-import { type Post, type PostMedia, type PostWithAuthor, type User } from '@/types';
+import { FriendWithProfile, type Post, type PostMedia, type PostWithAuthor } from '@/types';
 import { type PhotoItem } from '@/components/posts';
 import { calculateAspectRatio, clampAspectRatio } from '@/utils/media';
 
@@ -163,23 +163,16 @@ export async function getPost(postId: string): Promise<Post | null> {
 
 /**
  * Get a post with author information
+ * Uses FriendsContext for author data if provided (all users are friends)
  */
-export async function getPostWithAuthor(postId: string): Promise<PostWithAuthor | null> {
+export async function getPostWithAuthor(postId: string, getFriendById: FriendLookup): Promise<PostWithAuthor | null> {
   const post = await getPost(postId);
   if (!post) return null;
 
-  const author = await getDocument<User>(COLLECTIONS.USERS, post.authorId);
+  const author = getFriendById(post.authorId);
   if (!author) return null;
 
-  return {
-    ...post,
-    author: {
-      id: post.authorId,
-      username: author.username,
-      fullName: author.fullName,
-      profilePhotoUrl: author.profilePhotoUrl,
-    },
-  };
+  return { ...post, author: author.user };
 }
 
 /**
@@ -319,11 +312,16 @@ export interface PaginatedFeedResult {
   hasMore: boolean;
 }
 
+// Type for friend lookup function (from FriendsContext)
+export type FriendLookup = (userId: string) => FriendWithProfile | undefined;
+
 /**
  * Get posts for a user's feed (posts from friends) with pagination
+ * Uses FriendsContext for author data (all users are friends)
  */
 export async function getFeedPosts(
   friendIds: string[],
+  getFriendById: FriendLookup,
   pageSize = 20,
   cursor?: DocumentSnapshot | null
 ): Promise<PaginatedFeedResult> {
@@ -342,31 +340,17 @@ export async function getFeedPosts(
     cursor
   );
 
-  // Fetch author info for each post
+  // Enrich posts with author info from FriendsContext (no Firestore fetch needed)
   const postsWithAuthors: PostWithAuthor[] = [];
-  const authorCache = new Map<string, User>();
 
   for (const post of result.data) {
-    let author = authorCache.get(post.authorId);
-    if (!author) {
-      const authorDoc = await getDocument<User>(COLLECTIONS.USERS, post.authorId);
-      if (authorDoc) {
-        author = authorDoc;
-        authorCache.set(post.authorId, author);
-      }
-    }
+    const friend = getFriendById(post.authorId);
+    if (!friend) continue;
 
-    if (author) {
-      postsWithAuthors.push({
-        ...post,
-        author: {
-          id: post.authorId,
-          username: author.username,
-          fullName: author.fullName,
-          profilePhotoUrl: author.profilePhotoUrl,
-        },
-      });
-    }
+    postsWithAuthors.push({
+      ...post,
+      author: friend.user,
+    });
   }
 
   return {

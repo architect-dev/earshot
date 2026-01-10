@@ -3,18 +3,11 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Avatar, Text } from '@/components/ui';
 import { formatMessageTimestamp } from '@/utils/formatting';
-import { type Conversation, type Message } from '@/types';
-import { type Timestamp } from 'firebase/firestore';
+import { type Message } from '@/types';
+import { type EnrichedConversation } from '@/contexts/ConversationsContext';
 
 interface ConversationRowProps {
-  conversation: Conversation;
-  otherUser?: {
-    id: string;
-    username: string;
-    fullName: string;
-    profilePhotoUrl: string | null;
-  };
-  lastMessage?: Message | null;
+  conversation: EnrichedConversation;
   currentUserId: string;
   onPress?: () => void;
 }
@@ -44,25 +37,22 @@ function getLastMessagePreview(message: Message | null | undefined): string {
   }
 }
 
-export function ConversationRow({
-  conversation,
-  otherUser,
-  lastMessage,
-  currentUserId,
-  onPress,
-}: ConversationRowProps) {
+export function ConversationRow({ conversation, currentUserId, onPress }: ConversationRowProps) {
   const { theme } = useTheme();
   const unreadCount = conversation.unreadCounts[currentUserId] || 0;
   const isMuted = conversation.mutedBy.includes(currentUserId);
 
-  // For DMs, show other user's info
+  // For DMs, get the other user's profile (exclude current user)
   // For groups, show group name
-  const displayName = conversation.type === 'dm' ? otherUser?.fullName || 'Unknown' : conversation.groupName || 'Group Chat';
-  const displayUsername = conversation.type === 'dm' ? otherUser?.username : null;
-  const avatarSource = conversation.type === 'dm' ? otherUser?.profilePhotoUrl : null;
-  const avatarName = conversation.type === 'dm' ? otherUser?.fullName : conversation.groupName || 'Group';
+  const otherUserProfile =
+    conversation.type === 'dm' ? conversation.participantProfiles.find((p) => p.id !== currentUserId) : null;
 
-  const preview = getLastMessagePreview(lastMessage);
+  const displayName =
+    conversation.type === 'dm' ? otherUserProfile?.fullName || 'Unknown' : conversation.groupName || 'Group Chat';
+  const avatarSource = conversation.type === 'dm' ? otherUserProfile?.profilePhotoUrl : null;
+  const avatarName = conversation.type === 'dm' ? otherUserProfile?.fullName : conversation.groupName || 'Group';
+
+  const preview = getLastMessagePreview(conversation.latestMessage);
   const timestamp = conversation.lastMessageAt ? formatMessageTimestamp(conversation.lastMessageAt) : '';
 
   return (
@@ -105,7 +95,7 @@ export function ConversationRow({
               size="sm"
               color="muted"
               numberOfLines={1}
-              weight={unreadCount > 0 && !isMuted ? 'semibold' : 'regular'}
+              weight={unreadCount > 0 && !isMuted ? 'semibold' : 'normal'}
             >
               {preview}
             </Text>
@@ -158,4 +148,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

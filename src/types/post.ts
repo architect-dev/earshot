@@ -1,4 +1,5 @@
 import { type Timestamp } from 'firebase/firestore';
+import { Profile } from './profile';
 
 export interface PostMedia {
   url: string;
@@ -28,10 +29,5 @@ export interface CreatePostData {
 
 // For displaying posts with author info
 export interface PostWithAuthor extends Post {
-  author: {
-    id: string;
-    username: string;
-    fullName: string;
-    profilePhotoUrl: string | null;
-  };
+  author: Profile;
 }

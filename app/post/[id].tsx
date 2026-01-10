@@ -8,23 +8,22 @@ import { PostCard } from '@/components/posts';
 import { PostInteractionModal } from '@/components/posts/PostInteractionModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFriends } from '@/contexts/FriendsContext';
 import { getPostWithAuthor } from '@/services/posts';
 import { findOrCreateDM } from '@/services/conversations';
 import { createMessage as createMessageService } from '@/services/messages';
-import { getDocument } from '@/services/firebase/firestore';
-import { COLLECTIONS } from '@/services/firebase/firestore';
 import { getErrorMessage } from '@/utils/errors';
-import { type PostWithAuthor, type User, type QuotedContent } from '@/types';
+import { type PostWithAuthor, type QuotedContent } from '@/types';
 
 export default function PostDetailScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { getFriendById } = useFriends();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [post, setPost] = useState<PostWithAuthor | null>(null);
-  const [author, setAuthor] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInteractionModal, setShowInteractionModal] = useState(false);
   const [interactionType, setInteractionType] = useState<'heart' | 'comment'>('heart');
@@ -35,7 +34,7 @@ export default function PostDetailScreen() {
     if (!id) return;
 
     try {
-      const postData = await getPostWithAuthor(id);
+      const postData = await getPostWithAuthor(id, getFriendById);
       if (!postData) {
         Alert.alert('Error', 'Post not found');
         router.back();
@@ -43,17 +42,13 @@ export default function PostDetailScreen() {
       }
 
       setPost(postData);
-
-      // Load author profile
-      const authorData = await getDocument<User>(COLLECTIONS.USERS, postData.authorId);
-      setAuthor(authorData);
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
       router.back();
     } finally {
       setLoading(false);
     }
-  }, [id, router]);
+  }, [id, router, getFriendById]);
 
   useEffect(() => {
     loadPost();
@@ -148,7 +143,7 @@ export default function PostDetailScreen() {
     );
   }
 
-  if (!post || !author) {
+  if (!post) {
     return null;
   }
 
@@ -170,9 +165,14 @@ export default function PostDetailScreen() {
           <FontAwesome6 name="chevron-left" size={18} color={theme.colors.text} />
         </Pressable>
         <View style={styles.headerContent}>
-          <Avatar source={author.profilePhotoUrl} name={author.fullName} size="sm" style={styles.headerAvatar} />
+          <Avatar
+            source={post.author.profilePhotoUrl}
+            name={post.author.fullName}
+            size="sm"
+            style={styles.headerAvatar}
+          />
           <Text size="lg" weight="semibold" style={styles.headerTitle}>
-            {author.fullName}'s Post
+            {post.author.fullName}'s Post
           </Text>
         </View>
       </View>

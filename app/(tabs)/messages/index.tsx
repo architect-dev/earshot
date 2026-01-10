@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer, Text, PageHeader, Modal, Button, TextInput } from '@/components/ui';
@@ -6,32 +6,18 @@ import { ConversationRow } from '@/components/messages';
 import { FriendRow } from '@/components/friends';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { getUserConversations, findOrCreateDM } from '@/services/conversations';
-import { getLastMessage } from '@/services/messages';
-import { getDocument } from '@/services/firebase/firestore';
-import { COLLECTIONS } from '@/services/firebase/firestore';
+import { useConversations } from '@/contexts/ConversationsContext';
 import { useFriends } from '@/contexts/FriendsContext';
-import { type Conversation, type Message, type User } from '@/types';
+import { findOrCreateDM } from '@/services/conversations';
 import { type FriendWithProfile } from '@/types';
-
-interface ConversationWithData extends Conversation {
-  otherUser?: {
-    id: string;
-    username: string;
-    fullName: string;
-    profilePhotoUrl: string | null;
-  };
-  lastMessage?: Message | null;
-}
 
 export default function MessagesScreen() {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const { conversations, loading, refreshConversations } = useConversations();
   const { friends, loading: friendsLoading } = useFriends();
   const router = useRouter();
 
-  const [conversations, setConversations] = useState<ConversationWithData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // New conversation modal
@@ -39,58 +25,9 @@ export default function MessagesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [creatingDM, setCreatingDM] = useState(false);
 
-  const loadConversations = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      // Get all conversations for the user
-      const userConversations = await getUserConversations(user.uid);
-
-      // Enrich conversations with last message and other user data
-      const enrichedConversations: ConversationWithData[] = await Promise.all(
-        userConversations.map(async (conv) => {
-          const enriched: ConversationWithData = { ...conv };
-
-          // Get last message for preview
-          const lastMsg = await getLastMessage(conv.id);
-          enriched.lastMessage = lastMsg;
-
-          // For DMs, get the other user's profile
-          if (conv.type === 'dm' && conv.participants.length === 2) {
-            const otherUserId = conv.participants.find((id) => id !== user.uid);
-            if (otherUserId) {
-              const otherUser = await getDocument<User>(COLLECTIONS.USERS, otherUserId);
-              if (otherUser) {
-                enriched.otherUser = {
-                  id: otherUser.id,
-                  username: otherUser.username,
-                  fullName: otherUser.fullName,
-                  profilePhotoUrl: otherUser.profilePhotoUrl,
-                };
-              }
-            }
-          }
-
-          return enriched;
-        })
-      );
-
-      setConversations(enrichedConversations);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Error loading conversations:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
-
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadConversations();
+    await refreshConversations();
     setRefreshing(false);
   };
 
@@ -98,16 +35,6 @@ export default function MessagesScreen() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     router.push(`/messages/${conversationId}` as any);
   };
-
-  // Sort conversations by lastMessageAt (most recent first)
-  const sortedConversations = useMemo(() => {
-    return [...conversations].sort((a, b) => {
-      if (!a.lastMessageAt && !b.lastMessageAt) return 0;
-      if (!a.lastMessageAt) return 1;
-      if (!b.lastMessageAt) return -1;
-      return b.lastMessageAt.toMillis() - a.lastMessageAt.toMillis();
-    });
-  }, [conversations]);
 
   // Filter friends by search query (fuzzy)
   const filteredFriends = useMemo(() => {
@@ -127,8 +54,8 @@ export default function MessagesScreen() {
       const conversation = await findOrCreateDM(user.uid, friend.user.id);
       setShowNewConversation(false);
       setSearchQuery('');
-      // Reload conversations to get the new one
-      await loadConversations();
+      // Refresh conversations to get the new one
+      await refreshConversations();
       // Navigate to the conversation
       router.push(`/messages/${conversation.id}`);
     } catch (err) {
@@ -154,13 +81,11 @@ export default function MessagesScreen() {
         style={styles.header}
       />
       <FlatList
-        data={sortedConversations}
+        data={conversations}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <ConversationRow
             conversation={item}
-            otherUser={item.otherUser}
-            lastMessage={item.lastMessage}
             currentUserId={user?.uid || ''}
             onPress={() => handleConversationPress(item.id)}
           />

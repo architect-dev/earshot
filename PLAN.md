@@ -420,12 +420,6 @@
   - [ ] Update messages list to use cached last messages (no individual fetches)
   - [ ] Update conversation screen to use cached initial messages
 
-- [ ] Create UserProfilesCache:
-  - [ ] Cache user profiles globally (deduplicate by userId)
-  - [ ] Batch fetch post authors after getting posts (deduplicate IDs)
-  - [ ] Update feed screen to batch fetch authors instead of per-post
-  - [ ] Update all screens to use cached profiles when available
-
 #### Real-time Subscriptions (Hybrid Approach)
 
 - [ ] Active conversation messages:
@@ -447,9 +441,9 @@
 
 #### Pull + Cache (No Subscriptions)
 
-- [ ] Friends list: Keep as pull + cache (changes infrequently)
+- [ ] Friends list: Keep as pull + cache (changes infrequently) - ✅ Already implemented via FriendsContext
 - [ ] Feed posts: Keep as pull + cache (large dataset, paginated)
-- [ ] User profiles: Pull + cache with TTL (unless actively viewing)
+- [ ] User profiles: Covered by FriendsContext (all profiles needed are friends' profiles)
 
 #### Implementation Details
 
@@ -460,15 +454,6 @@
 - [ ] Merge real-time updates with cached data
 - [ ] Prevent duplicate data in lists
 - [ ] Update optimistic UI to work with subscriptions
-
-#### Benefits
-
-- Eliminates duplicate user profile fetches
-- Eliminates individual last message fetches (N queries → 1 query)
-- Real-time updates for active conversations
-- Faster initial load with cached data
-- Reduced Firebase read costs
-- Better UX with instant updates
 
 ### Phase 7: Push Notifications
 

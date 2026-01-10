@@ -1,16 +1,41 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
-import { getUserConversations, getConversation } from '@/services/conversations';
-import { getLastMessage } from '@/services/messages';
-import { subscribeToQuery, subscribeToDocument, COLLECTIONS, where, orderBy } from '@/services/firebase/firestore';
-import { type Conversation, type Message } from '@/types';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { getUserConversations } from '@/services/conversations';
+import { subscribeToQuery, COLLECTIONS, where, orderBy } from '@/services/firebase/firestore';
+import { FriendWithProfile, type Conversation } from '@/types';
+import { type Profile } from '@/types/profile';
 import { useAuth } from './AuthContext';
+import { useFriends } from './FriendsContext';
+
+// Enriched conversation with participant profile data
+export interface EnrichedConversation extends Conversation {
+  participantProfiles: Profile[];
+}
+
+// Helper function to enrich a conversation with friend data
+function enrichConversation(
+  conv: Conversation,
+  getFriendById: (userId: string) => FriendWithProfile | undefined
+): EnrichedConversation {
+  const participantProfiles: Profile[] = [];
+
+  // Enrich with all participants' profiles from FriendsContext
+  for (const participantId of conv.participants) {
+    const friend = getFriendById(participantId);
+    if (friend) participantProfiles.push(friend.user);
+  }
+
+  return {
+    ...conv,
+    participantProfiles,
+  };
+}
 
 interface ConversationsContextValue {
-  conversations: Conversation[];
+  conversations: EnrichedConversation[];
   loading: boolean;
   error: Error | null;
   refreshConversations: () => Promise<void>;
-  getConversationById: (conversationId: string) => Conversation | undefined;
+  getConversationById: (conversationId: string) => EnrichedConversation | undefined;
   activeConversationId: string | null;
   setActiveConversationId: (id: string | null) => void;
 }
@@ -23,7 +48,8 @@ interface ConversationsProviderProps {
 
 export function ConversationsProvider({ children }: ConversationsProviderProps) {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const { loading: friendsLoading, getFriendById } = useFriends();
+  const [conversations, setConversations] = useState<EnrichedConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -38,7 +64,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
   }, [activeConversationId]);
 
   const loadConversations = useCallback(async () => {
-    if (!user) {
+    if (!user || friendsLoading) {
       setConversations([]);
       setLoading(false);
       return;
@@ -50,18 +76,10 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
       // Get all conversations for the user
       const userConversations = await getUserConversations(user.uid);
 
-      // For each conversation, fetch the latest message
-      const conversationsWithLatestMessage = await Promise.all(
-        userConversations.map(async (conv) => {
-          const latestMessage = await getLastMessage(conv.id);
-          return {
-            ...conv,
-            latestMessage,
-          };
-        })
-      );
+      // Enrich conversations with friend data
+      const enriched = userConversations.map((conv) => enrichConversation(conv, getFriendById));
 
-      setConversations(conversationsWithLatestMessage);
+      setConversations(enriched);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load conversations'));
       // eslint-disable-next-line no-console
@@ -69,7 +87,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, getFriendById, friendsLoading]);
 
   // Load conversations when user changes
   useEffect(() => {
@@ -94,14 +112,9 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
           const merged = updatedConversations.map((conv) => {
             const prevConv = prevMap.get(conv.id);
 
-            // If this is a new conversation, use it as-is
-            if (!prevConv) {
-              return conv;
-            }
-
             // Check if latestMessage changed (new message arrived)
             const latestMessageChanged =
-              conv.latestMessage?.id !== prevConv.latestMessage?.id && conv.latestMessage !== null;
+              prevConv && conv.latestMessage?.id !== prevConv.latestMessage?.id && conv.latestMessage !== null;
 
             const isFromOtherUser = conv.latestMessage?.senderId !== user.uid;
             const isConversationActive = activeConversationIdRef.current === conv.id;
@@ -112,11 +125,15 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
               updatedUnreadCounts[user.uid] = (updatedUnreadCounts[user.uid] || 0) + 1;
             }
 
-            return {
+            // Merge with previous conversation data
+            const mergedConv: Conversation = {
               ...conv,
-              latestMessage: conv.latestMessage || prevConv.latestMessage || null,
+              latestMessage: conv.latestMessage || prevConv?.latestMessage || null,
               unreadCounts: updatedUnreadCounts,
             };
+
+            // Enrich the conversation with friend data
+            return enrichConversation(mergedConv, getFriendById);
           });
 
           return merged;
@@ -132,32 +149,22 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
         conversationsUnsubscribeRef.current = null;
       }
     };
-  }, [user]);
-
-  // Subscribe to new messages for each conversation
-  // Note: We subscribe to conversations which already includes latestMessage updates
-  // This effect handles updating unread counts when new messages arrive
-  useEffect(() => {
-    if (!user || conversations.length === 0) {
-      return;
-    }
-
-    // The conversation subscription will handle latestMessage updates
-    // We just need to track when new messages arrive to update unread counts
-    // This is handled by the conversation subscription callback above
-  }, [user, conversations, activeConversationId]);
+  }, [user, getFriendById]);
 
   // Get conversation by ID
   const getConversationById = useCallback(
-    (conversationId: string): Conversation | undefined => {
+    (conversationId: string): EnrichedConversation | undefined => {
       return conversations.find((c) => c.id === conversationId);
     },
     [conversations]
   );
 
+  // Loading is true if conversations are loading OR friends are loading
+  const isLoading = loading || friendsLoading;
+
   const value: ConversationsContextValue = {
     conversations,
-    loading,
+    loading: isLoading,
     error,
     refreshConversations: loadConversations,
     getConversationById,

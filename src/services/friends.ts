@@ -354,6 +354,7 @@ export async function getPendingRequests(userId: string): Promise<{
           username: otherUser.username,
           fullName: otherUser.fullName,
           profilePhotoUrl: otherUser.profilePhotoUrl,
+          lastSeen: otherUser.lastSeen,
         },
         createdAt: request.createdAt,
         direction: isIncoming ? 'incoming' : 'outgoing',
