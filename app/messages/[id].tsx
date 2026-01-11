@@ -9,11 +9,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConversations, useConversation } from '@/contexts/ConversationsContext';
 import { markMessagesAsRead } from '@/services/messages';
-import { getDocument } from '@/services/firebase/firestore';
-import { COLLECTIONS } from '@/services/firebase/firestore';
 import {
   type Message,
-  type User,
   type QuotedContent,
   type PendingMessage,
   type MessageWithReactions,
@@ -48,9 +45,6 @@ export default function ConversationScreen() {
   const [selectedMessage, setSelectedMessage] = useState<MessageWithReactions | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
-  // Store user profiles for display
-  const userProfilesRef = useRef<Map<string, User>>(new Map());
-  const [userProfiles, setUserProfiles] = useState<Map<string, User>>(new Map());
   const flatListRef = useRef<FlatList>(null);
 
   // Set active conversation when screen opens
@@ -91,25 +85,6 @@ export default function ConversationScreen() {
     return () => clearTimeout(timeout);
   }, [conversationId, user, conversation, messages]);
 
-  // Load user profiles for participants
-  useEffect(() => {
-    if (!conversation) return;
-
-    const loadProfiles = async () => {
-      const profiles = new Map<string, User>();
-      for (const participantId of conversation.participants) {
-        const profile = await getDocument<User>(COLLECTIONS.USERS, participantId);
-        if (profile) {
-          profiles.set(participantId, profile);
-        }
-      }
-      userProfilesRef.current = profiles;
-      setUserProfiles(new Map(profiles));
-    };
-
-    loadProfiles();
-  }, [conversation]);
-
   // Load more messages (infinite scroll)
   const handleLoadMore = useCallback(async () => {
     if (!hasMore || !loadMore) return;
@@ -129,19 +104,6 @@ export default function ConversationScreen() {
       setQuotedContent(null);
     },
     [sendMessage]
-  );
-
-  // Get user profile for a participant
-  const getUserProfile = useCallback((userId: string): User | null => {
-    return userProfilesRef.current.get(userId) || null;
-  }, []);
-
-  // Get message by ID (for quoted content lookup)
-  const getMessageById = useCallback(
-    (messageId: string): Message | null => {
-      return messages.find((msg) => msg.id === messageId) || null;
-    },
-    [messages]
   );
 
   // Combine messages and pending messages for display
@@ -276,9 +238,8 @@ export default function ConversationScreen() {
     if (!conversation || !user || conversation.type !== 'dm') return null;
     const otherUserId = conversation.participants.find((id) => id !== user.uid);
     if (!otherUserId) return null;
-    // Get from userProfiles state which triggers re-render when updated
-    return userProfiles.get(otherUserId) || null;
-  }, [conversation, user, userProfiles]);
+    return conversation.participantProfiles.find((p) => p.id === otherUserId) || null;
+  }, [conversation, user]);
 
   // Header title and avatar
   const headerTitle = useMemo(() => {
@@ -312,10 +273,13 @@ export default function ConversationScreen() {
   const handleMessageReply = useCallback(
     (message: Message) => {
       // Create quoted content from message - always use real profile
-      const senderProfile = getUserProfile(message.senderId);
+      const senderProfile = conversation?.participantProfiles?.find((p) => p.id === message.senderId) || null;
+      if (!senderProfile) return;
+
       const quoted: QuotedContent = {
         type: 'message',
         messageId: message.id,
+        senderId: message.senderId,
         preview: {
           senderName: senderProfile?.fullName || 'Unknown',
           senderUsername: senderProfile?.username || '',
@@ -325,7 +289,7 @@ export default function ConversationScreen() {
       };
       setQuotedContent(quoted);
     },
-    [getUserProfile]
+    [conversation]
   );
 
   const handleMessageDelete = useCallback(() => {
@@ -441,13 +405,8 @@ export default function ConversationScreen() {
           const opacity = isPending ? 0.75 : 1;
 
           // Get sender info for group chats
-          let senderName: string | undefined;
-          let senderAvatar: string | null | undefined;
-          if (!isOwn && conversation.type === 'group') {
-            const senderProfile = getUserProfile(message.senderId);
-            senderName = senderProfile?.fullName;
-            senderAvatar = senderProfile?.profilePhotoUrl;
-          }
+          const senderProfile = conversation?.participantProfiles?.find((p) => p.id === message.senderId) || null;
+          if (!senderProfile) return null;
 
           const messageId = 'id' in message ? message.id : message.pendingId;
           const isHighlighted = highlightedMessageId === messageId;
@@ -455,13 +414,10 @@ export default function ConversationScreen() {
           return (
             <MessageBubble
               message={message as MessageWithReactions}
+              senderProfile={senderProfile}
               isOwn={isOwn}
-              senderName={senderName}
-              senderAvatar={senderAvatar}
               opacity={opacity}
               isHighlighted={isHighlighted}
-              getUserProfile={getUserProfile}
-              getMessage={getMessageById}
               onLongPress={() => handleMessageLongPress(message as MessageWithReactions)}
               onQuotedPostPress={(postId) => router.push(`/post/${postId}`)}
               onQuotedMessagePress={handleQuotedMessagePress}

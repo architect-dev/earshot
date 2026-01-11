@@ -3,18 +3,18 @@ import { View, Pressable, StyleSheet, Image } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text, Avatar } from '@/components/ui';
-import { type QuotedContent, type Message } from '@/types';
+import { type QuotedContent } from '@/types';
+import { Profile } from '@/types/profile';
 
 export type QuotedContentVariant = 'message' | 'input' | 'modal';
 
 interface QuotedContentProps {
   quotedContent: QuotedContent;
+  senderProfile: Profile;
   variant?: QuotedContentVariant; // 'message' for message bubbles, 'input' for input preview, 'modal' for modals
   postReplyType?: 'comment' | 'heart';
   onPress?: () => void; // For message bubbles - navigate to quoted content
   onClear?: () => void; // For input - clear the quote
-  getUserProfile?: (userId: string) => { fullName: string; profilePhotoUrl: string | null } | null; // For quoted message avatars
-  getMessage?: (messageId: string) => Message | null; // To get senderId from quoted message
 }
 
 export function QuotedContent({
@@ -23,28 +23,17 @@ export function QuotedContent({
   postReplyType,
   onPress,
   onClear,
-  getUserProfile,
-  getMessage,
+  senderProfile,
 }: QuotedContentProps) {
   const { theme } = useTheme();
 
   // Get quoted message sender profile
-  const getQuotedMessageSender = () => {
-    if (quotedContent.type === 'message' && getMessage && getUserProfile) {
-      const quotedMsg = getMessage(quotedContent.messageId);
-      if (quotedMsg) {
-        return getUserProfile(quotedMsg.senderId);
-      }
-    }
-    return null;
-  };
 
-  const quotedSenderProfile = getQuotedMessageSender();
   const displayName =
     quotedContent.type === 'post'
       ? quotedContent.preview.authorName
-      : quotedSenderProfile?.fullName || quotedContent.preview.senderName;
-  const displayAvatar = quotedContent.type === 'post' ? null : quotedSenderProfile?.profilePhotoUrl || null;
+      : senderProfile.fullName || quotedContent.preview.senderName;
+  const displayAvatar = quotedContent.type === 'post' ? null : senderProfile.profilePhotoUrl || null;
 
   // Different styles based on variant
   const containerStyle =

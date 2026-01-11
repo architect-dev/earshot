@@ -3,36 +3,31 @@ import { View, Pressable, StyleSheet, Image } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor } from 'react-native-reanimated';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text, Avatar } from '@/components/ui';
-import { PendingMessage, type Message, type MessageWithReactions } from '@/types';
+import { PendingMessage, Profile, type Message, type MessageWithReactions } from '@/types';
 import { QuotedContent } from './QuotedContent';
 import { FontAwesome6 } from '@expo/vector-icons';
 
 interface MessageBubbleProps {
   message: MessageWithReactions;
+  senderProfile: Profile;
   isOwn: boolean;
-  senderName?: string; // For group chats
-  senderAvatar?: string | null; // For group chats
   onPress?: () => void;
   onLongPress?: () => void;
   onQuotedPostPress?: (postId: string) => void;
   onQuotedMessagePress?: (messageId: string) => void;
   getUserProfile?: (userId: string) => { fullName: string; profilePhotoUrl: string | null } | null; // For quoted message avatars
-  getMessage?: (messageId: string) => Message | null; // To get senderId from quoted message
   opacity?: number; // For pending messages (0.5)
   isHighlighted?: boolean; // For flash effect when scrolling to message
 }
 
 export function MessageBubble({
   message,
+  senderProfile,
   isOwn,
-  senderName,
-  senderAvatar,
   onPress,
   onLongPress,
   onQuotedPostPress,
   onQuotedMessagePress,
-  getUserProfile,
-  getMessage,
   opacity = 1,
   isHighlighted = false,
 }: MessageBubbleProps) {
@@ -171,12 +166,12 @@ export function MessageBubble({
       onLongPress={onLongPress}
     >
       {/* Group chat: show sender avatar and name */}
-      {!isOwn && senderName && (
+      {!isOwn && senderProfile.fullName && (
         <View style={styles.senderInfo}>
-          <Avatar source={senderAvatar} name={senderName} size="xs" />
-          {senderName && (
+          <Avatar source={senderProfile.profilePhotoUrl} name={senderProfile.fullName} size="xs" />
+          {senderProfile.fullName && (
             <Text size="xs" color="muted" style={styles.senderName}>
-              {senderName}
+              {senderProfile.fullName}
             </Text>
           )}
         </View>
@@ -186,6 +181,7 @@ export function MessageBubble({
       {message.quotedContent && (
         <QuotedContent
           quotedContent={message.quotedContent}
+          senderProfile={senderProfile}
           variant="message"
           postReplyType={
             message.quotedContent.type === 'post' ? (message.type === 'heart' ? 'heart' : 'comment') : undefined
@@ -197,8 +193,6 @@ export function MessageBubble({
               onQuotedMessagePress(message.quotedContent.messageId);
             }
           }}
-          getUserProfile={getUserProfile}
-          getMessage={getMessage}
         />
       )}
 

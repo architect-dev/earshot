@@ -51,6 +51,7 @@ export function PostInteractionProvider({ children }: PostInteractionProviderPro
         const quotedContent: QuotedContent = {
           type: 'post',
           postId: interactionPost.id,
+          senderId: interactionPost.author.id,
           preview: {
             authorName: interactionPost.author.fullName,
             authorUsername: interactionPost.author.username,

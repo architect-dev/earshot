@@ -6,6 +6,7 @@ export type ConversationType = 'dm' | 'group';
 export interface QuotedPost {
   type: 'post';
   postId: string;
+  senderId: string;
   preview: {
     text?: string;
     mediaUrl?: string;
@@ -17,6 +18,7 @@ export interface QuotedPost {
 export interface QuotedMessage {
   type: 'message';
   messageId: string; // Only message ID needed (same conversation)
+  senderId: string;
   preview: {
     text?: string;
     mediaUrl?: string;

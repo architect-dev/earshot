@@ -181,6 +181,7 @@ export function PostInteractionModal({ visible, onClose, onSend, post, type, loa
   const quotedContent: QuotedContentType = {
     type: 'post',
     postId: post.id,
+    senderId: post.author.id,
     preview: {
       authorName: post.author.fullName,
       authorUsername: post.author.username,
@@ -259,7 +260,7 @@ export function PostInteractionModal({ visible, onClose, onSend, post, type, loa
         <Spacer size={16} />
 
         {/* Quoted Post Preview */}
-        <QuotedContent quotedContent={quotedContent} variant="modal" postReplyType={type} />
+        <QuotedContent quotedContent={quotedContent} senderProfile={post.author} variant="modal" postReplyType={type} />
 
         {isHeartMode && (
           <>

@@ -6,6 +6,7 @@ import { TextInput } from '@/components/ui';
 import * as ImagePicker from 'expo-image-picker';
 import { type QuotedContent } from '@/types';
 import { QuotedContent as QuotedContentComponent } from './QuotedContent';
+import { useFriends } from '@/contexts/FriendsContext';
 
 interface MessageInputProps {
   onSend: (content: string, quotedContent: QuotedContent | null, mediaUri?: string) => void;
@@ -17,6 +18,8 @@ interface MessageInputProps {
 export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = false }: MessageInputProps) {
   const { theme } = useTheme();
   const [text, setText] = useState('');
+  const { getProfileById } = useFriends();
+  const quotedSenderProfile = quotedContent ? getProfileById(quotedContent.senderId) : null;
 
   const handleSend = () => {
     if (!text.trim() && !quotedContent) return;
@@ -51,7 +54,14 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
       style={[styles.container, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.highlightLow }]}
     >
       {/* Quoted content preview */}
-      {quotedContent && <QuotedContentComponent quotedContent={quotedContent} variant="input" onClear={onClearQuote} />}
+      {quotedContent && quotedSenderProfile && (
+        <QuotedContentComponent
+          quotedContent={quotedContent}
+          senderProfile={quotedSenderProfile}
+          variant="input"
+          onClear={onClearQuote}
+        />
+      )}
 
       <View style={styles.inputRow}>
         <View style={styles.inputWrapper}>
