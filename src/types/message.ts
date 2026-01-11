@@ -65,8 +65,6 @@ export type DividerType = 'time' | 'newMessages';
 
 export interface DividerMessage {
   type: 'divider';
-  dividerType: DividerType;
   id: string;
-  timestamp?: Timestamp;
   label: string;
 }

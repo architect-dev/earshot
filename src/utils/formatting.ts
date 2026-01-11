@@ -146,3 +146,13 @@ export function isMoreThanOneHour(timestamp1: Timestamp | Date, timestamp2: Time
   const MS_PER_HOUR = 60 * 60 * 1000;
   return diffMs > MS_PER_HOUR;
 }
+
+/**
+ * Format date for divider (e.g., "Jan 11")
+ */
+export function formatDateDivider(timestamp: Timestamp | Date): string {
+  const date = timestamp instanceof Date ? timestamp : timestamp.toDate();
+  const day = date.getDate();
+  const month = MONTHS[date.getMonth()];
+  return `${month} ${day}`;
+}

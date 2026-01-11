@@ -11,8 +11,16 @@ import { useConversations, useConversation } from '@/contexts/ConversationsConte
 import { markMessagesAsRead } from '@/services/messages';
 import { getDocument } from '@/services/firebase/firestore';
 import { COLLECTIONS } from '@/services/firebase/firestore';
-import { type Message, type User, type QuotedContent, type PendingMessage, type MessageWithReactions } from '@/types';
+import {
+  type Message,
+  type User,
+  type QuotedContent,
+  type PendingMessage,
+  type MessageWithReactions,
+  DividerMessage,
+} from '@/types';
 import { useSendMessage } from '@/hooks/useSendMessage';
+import { isDifferentDay, formatDateDivider } from '@/utils/formatting';
 
 export default function ConversationScreen() {
   const { theme } = useTheme();
@@ -113,8 +121,8 @@ export default function ConversationScreen() {
   // Send message
   const handleSend = useCallback(
     async (content: string, quotedContent: QuotedContent | null, mediaUri?: string) => {
-      const success = await sendMessage(content, quotedContent, mediaUri);
-      if (success) setQuotedContent(null);
+      sendMessage(content, quotedContent, mediaUri);
+      setQuotedContent(null);
     },
     [sendMessage]
   );
@@ -155,16 +163,17 @@ export default function ConversationScreen() {
     // 3. Convert to chronological order (oldest first) for stitching
     const chronologicalMessages = [...regularMessages].reverse();
 
-    // 5. Stitch reactions and pending reactions after their target messages
+    // 5. Stitch reactions
     const stitched: Array<MessageWithReactions> = [];
     chronologicalMessages.forEach((message) => {
       stitched.push({ ...message, reactions: reactionsByTarget.get(message.id) || [] });
     });
+
     // 6. Reverse back to reverse chronological (for inverted FlatList)
     const reversedWithDividers = stitched.reverse();
 
     // 7. Add pending messages at the beginning (they're newest, so add after reversing)
-    const allMessages: Array<MessageWithReactions> = [...reversedWithDividers];
+    const allMessages: Array<MessageWithReactions | DividerMessage> = [...reversedWithDividers];
     for (const pending of pendingMessages) {
       // Skip pending reactions
       if (pending.type === 'reaction') continue;
@@ -189,7 +198,73 @@ export default function ConversationScreen() {
       allMessages.unshift(pendingAsMessage);
     }
 
-    return allMessages;
+    // 8. Insert dividers (date breaks and "New Messages" divider)
+    const withDividers: Array<MessageWithReactions | DividerMessage> = [];
+    let newMessagesDividerInserted = false;
+
+    for (let i = 0; i < allMessages.length; i++) {
+      const currentMessage = allMessages[i];
+
+      // Skip dividers that might already be in the list (shouldn't happen, but safety check)
+      if ('type' in currentMessage && currentMessage.type === 'divider') {
+        withDividers.push(currentMessage as DividerMessage);
+        continue;
+      }
+
+      const currentTimestamp = currentMessage.createdAt;
+      const isCurrentUnread =
+        currentMessage.senderId !== user.uid && 'readBy' in currentMessage && !currentMessage.readBy.includes(user.uid);
+
+      // Check if we need to insert "New Messages" divider
+      // Insert between last unread message and first read message
+      if (!newMessagesDividerInserted && i > 0) {
+        const previousMessage = allMessages[i - 1];
+
+        // Skip if previous is a divider
+        if (!('type' in previousMessage && previousMessage.type === 'divider')) {
+          const previousIsUnread =
+            previousMessage.senderId !== user.uid &&
+            'readBy' in previousMessage &&
+            !previousMessage.readBy.includes(user.uid);
+
+          // If previous was unread and current is read, insert divider
+          if (previousIsUnread && !isCurrentUnread) {
+            const newMessagesDivider: DividerMessage = {
+              type: 'divider',
+              id: 'divider-newMessages',
+              label: 'New Messages',
+            };
+            withDividers.push(newMessagesDivider);
+            newMessagesDividerInserted = true;
+          }
+        }
+      }
+
+      // Add current message
+      withDividers.push(currentMessage);
+
+      // Check if we need to insert date break after this message
+      if (i < allMessages.length - 1) {
+        const nextMessage = allMessages[i + 1];
+
+        // Skip if next is a divider
+        if (!('type' in nextMessage && nextMessage.type === 'divider')) {
+          const nextTimestamp = nextMessage.createdAt;
+
+          // Insert date divider when days are different
+          if (isDifferentDay(currentTimestamp, nextTimestamp)) {
+            const dateBreak: DividerMessage = {
+              type: 'divider',
+              id: `divider-time-${nextMessage.id}`,
+              label: formatDateDivider(nextTimestamp),
+            };
+            withDividers.push(dateBreak);
+          }
+        }
+      }
+    }
+
+    return withDividers;
   }, [messages, conversationId, pendingMessages, user]);
 
   // Get other user info (for DMs)
@@ -332,14 +407,29 @@ export default function ConversationScreen() {
         ref={flatListRef}
         data={displayMessages}
         keyExtractor={(item) => {
-          // Handle pending reactions
+          // Handle dividers
+          if ('type' in item && item.type === 'divider') {
+            return (item as DividerMessage).id;
+          }
+          // Handle pending messages
           if ('isPending' in item && item.isPending) {
             return (item as PendingMessage).pendingId;
           }
-          // Handle regular messages and pending messages
-          return item.id;
+          // Handle regular messages
+          return (item as MessageWithReactions).id;
         }}
         renderItem={({ item }) => {
+          // Handle dividers
+          const isDivider = 'type' in item && item.type === 'divider';
+          if (isDivider) {
+            return (
+              <View style={styles.dividerContainer}>
+                <Text size="sm" color="muted" style={{ fontStyle: 'italic' }}>
+                  {item.label}
+                </Text>
+              </View>
+            );
+          }
           // Handle regular messages and pending messages
           const message = item as MessageWithReactions | PendingMessage;
           const isOwn = message.senderId === user?.uid;
@@ -417,16 +507,9 @@ const styles = StyleSheet.create({
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    justifyContent: 'center',
+    paddingVertical: 4,
     paddingHorizontal: 16,
-    gap: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    paddingHorizontal: 8,
   },
   container: {
     flex: 1,

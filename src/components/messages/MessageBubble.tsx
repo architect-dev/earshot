@@ -143,14 +143,21 @@ export function MessageBubble({
   };
 
   const renderReactions = () => {
+    if (message.reactions.length === 0) return null;
+    const reactionsContainerStyle = isOwn ? styles.ownReactionsContainer : styles.otherReactionsContainer;
     return (
-      <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
+      <View style={[styles.reactionsContainer, reactionsContainerStyle]}>
         {message.reactions.map((reaction) => (
           <View
             key={getReactionId(reaction)}
-            style={[styles.reactionBubble, { opacity: getReactionIsPending(reaction) ? 0.3 : 1 }]}
+            style={[
+              styles.reactionBubble,
+              { opacity: getReactionIsPending(reaction) ? 0.3 : 1, backgroundColor: theme.colors.highlightLow },
+            ]}
           >
-            <Text size="sm">{reaction.reactionType === 'heart' ? '❤️' : '👍'}</Text>
+            {reaction.reactionType === 'heart' && (
+              <FontAwesome6 name="heart" size={14} color={theme.colors.love} solid />
+            )}
           </View>
         ))}
       </View>
@@ -208,9 +215,6 @@ export function MessageBubble({
         {/* Main content */}
         {renderContent()}
 
-        {/* Reactions */}
-        {renderReactions()}
-
         {/* Timestamp and read receipt */}
         {/* <View style={styles.footer}>
           <Text size="xs" color={isOwn ? 'foam' : 'muted'}>
@@ -223,6 +227,9 @@ export function MessageBubble({
           )}
         </View> */}
       </Animated.View>
+
+      {/* Reactions */}
+      {renderReactions()}
     </Pressable>
   );
 }
@@ -234,9 +241,11 @@ const styles = StyleSheet.create({
   },
   ownContainer: {
     alignItems: 'flex-end',
+    marginLeft: 'auto',
   },
   otherContainer: {
     alignItems: 'flex-start',
+    marginRight: 'auto',
   },
   senderInfo: {
     flexDirection: 'row',
@@ -307,5 +316,22 @@ const styles = StyleSheet.create({
   readReceipt: {
     marginLeft: 4,
   },
-  reactionBubble: {},
+  reactionBubble: {
+    padding: 4,
+    paddingHorizontal: 8,
+  },
+  reactionsContainer: {
+    flexDirection: 'row',
+    gap: 4,
+    flexWrap: 'wrap',
+    marginTop: -4,
+  },
+  ownReactionsContainer: {
+    alignSelf: 'flex-start',
+    marginLeft: 8,
+  },
+  otherReactionsContainer: {
+    alignSelf: 'flex-end',
+    marginRight: 8,
+  },
 });
