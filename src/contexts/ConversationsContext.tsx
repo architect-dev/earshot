@@ -274,9 +274,9 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
             [
               where('conversationId', '==', conversationId),
               orderBy('createdAt', 'desc'),
-              limit(1), // Only get the latest message
+              limit(50), // Get the 50 most recent messages for real-time updates
             ],
-            (messages) => {
+            (subscriptionMessages) => {
               const isInitial = isInitialSnapshot.get(conversationId);
               if (isInitial) {
                 // First snapshot - ignore, we already have messages from pre-fetch
@@ -284,37 +284,69 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
                 return;
               }
 
-              if (messages.length === 0) {
+              if (subscriptionMessages.length === 0) {
                 return;
               }
 
-              // We only get the latest message (limit 1), so messages[0] is the newest
-              const latestMessage = messages[0];
+              // Remove pending messages for any messages that have a pendingId
+              subscriptionMessages.forEach((msg) => {
+                if (msg.pendingId) {
+                  removePendingMessage(conversationId, msg.pendingId);
+                }
+              });
 
-              // Remove pending message if it exists and new message has a pendingId
-              if (latestMessage.pendingId) {
-                removePendingMessage(conversationId, latestMessage.pendingId);
-              }
-
-              // Update messages with the new message
+              // Merge subscription messages with cached messages
               setMessages((prev) => {
                 const existing = prev.get(conversationId);
                 if (!existing) {
                   return prev; // Messages not initialized yet
                 }
 
-                // Check if this message is already in our messages
-                const messageExists = existing.messages.some((msg) => msg.id === latestMessage.id);
-                if (messageExists) {
-                  return prev;
-                }
+                // Create a map of subscription messages by ID for fast lookup
+                const subscriptionMessagesMap = new Map<string, Message>();
+                subscriptionMessages.forEach((msg) => {
+                  subscriptionMessagesMap.set(msg.id, msg);
+                });
 
-                // Add new message to the beginning (most recent first)
+                // Merge logic:
+                // 1. Update existing messages if they're in the subscription (handles deletions/updates)
+                // 2. Keep older messages that aren't in the subscription
+                // 3. Add new messages from subscription that aren't in cache
+                const mergedMessages: Message[] = [];
+                const subscriptionMessageIds = new Set(subscriptionMessagesMap.keys());
+
+                // Process cached messages
+                existing.messages.forEach((cachedMsg) => {
+                  if (subscriptionMessageIds.has(cachedMsg.id)) {
+                    // Message is in subscription - use the subscription version (handles updates/deletions)
+                    mergedMessages.push(subscriptionMessagesMap.get(cachedMsg.id)!);
+                  } else {
+                    // Message is not in subscription (older than top 50) - keep cached version
+                    mergedMessages.push(cachedMsg);
+                  }
+                });
+
+                // Add any new messages from subscription that aren't in cache
+                subscriptionMessages.forEach((subMsg) => {
+                  const existsInCache = existing.messages.some((msg) => msg.id === subMsg.id);
+                  if (!existsInCache) {
+                    // New message - add it (will be sorted by createdAt below)
+                    mergedMessages.push(subMsg);
+                  }
+                });
+
+                // Sort by createdAt desc (most recent first)
+                mergedMessages.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+
+                // Update lastFetchedAt to the most recent message's timestamp
+                const mostRecentTimestamp =
+                  mergedMessages.length > 0 ? mergedMessages[0].createdAt : existing.lastFetchedAt;
+
                 const newMap = new Map(prev);
                 newMap.set(conversationId, {
                   ...existing,
-                  messages: [latestMessage, ...existing.messages],
-                  lastFetchedAt: latestMessage.createdAt,
+                  messages: mergedMessages,
+                  lastFetchedAt: mostRecentTimestamp,
                 });
 
                 return newMap;
