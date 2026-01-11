@@ -245,7 +245,7 @@
   - [x] Modal for searching friends to create DMs
   - [x] Fuzzy search for friends in new conversation modal
   - [x] Find or create DM functionality
-  - [x] "CREATE GROUP" button (placeholder alert)
+  - [x] "CREATE GROUP" button (hidden - post v1 feature)
 - [x] Build MessageInput component:
   - [x] Text input with multiline support
   - [x] Photo picker button
@@ -704,7 +704,7 @@ earshot/
 - [ ] Leave group chat
 - [ ] Rename group chat
 - [ ] Theme toggle works
-- [ ] Push notifications received (DM and group chat)
+- [ ] Push notifications received (DM and group chat) - Group chat notifications: **Post v1**
 - [ ] Delete post
 - [ ] Delete account
 
@@ -741,8 +741,8 @@ The demo is ready for beta testers when:
 7. ✅ Users can view friends' posts in feed
 8. ✅ Users can heart/comment on posts (sends DM)
 9. ✅ Users can send/receive direct messages
-10. ✅ Users can create and participate in group chats (Phase 6)
-11. ✅ Users can choose group chat when hearting/commenting on posts (if group chat exists)
+10. ⏸️ Users can create and participate in group chats (Phase 6) - **Post v1**
+11. ⏸️ Users can choose group chat when hearting/commenting on posts (if group chat exists) - **Post v1**
 12. ✅ Push notifications work for messages and requests
 13. ✅ App works on both iOS and Android
 14. ✅ No critical crashes (Sentry monitored)

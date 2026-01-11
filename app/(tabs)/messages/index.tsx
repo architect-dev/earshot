@@ -5,7 +5,6 @@ import { ScreenContainer, Text, PageHeader, Modal, Button, TextInput } from '@/c
 import { ConversationRow } from '@/components/messages';
 import { FriendRow } from '@/components/friends';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
 import { useConversations } from '@/contexts/ConversationsContext';
 import { useFriends } from '@/contexts/FriendsContext';
 import { findOrCreateDM } from '@/services/conversations';
@@ -13,7 +12,6 @@ import { type FriendWithProfile } from '@/types';
 
 export default function MessagesScreen() {
   const { user } = useAuth();
-  const { theme } = useTheme();
   const { conversations, loading, refreshConversations } = useConversations();
   const { friends, loading: friendsLoading } = useFriends();
   const router = useRouter();
@@ -67,10 +65,10 @@ export default function MessagesScreen() {
     }
   };
 
-  // Handle create group button
-  const handleCreateGroup = () => {
-    Alert.alert('Create Group', 'Group chat creation coming soon!');
-  };
+  // Group chat creation - Post v1 feature
+  // const handleCreateGroup = () => {
+  //   Alert.alert('Create Group', 'Group chat creation coming soon!');
+  // };
 
   return (
     <ScreenContainer padded={false}>
@@ -116,9 +114,10 @@ export default function MessagesScreen() {
             autoFocus
           />
 
-          <View style={[styles.createGroupButton, { borderTopColor: theme.colors.highlightLow }]}>
+          {/* Group chat creation - Post v1 feature */}
+          {/* <View style={[styles.createGroupButton, { borderTopColor: theme.colors.highlightLow }]}>
             <Button title="CREATE GROUP" variant="ghost" onPress={handleCreateGroup} />
-          </View>
+          </View> */}
 
           {friendsLoading ? (
             <View style={styles.loadingContainer}>
