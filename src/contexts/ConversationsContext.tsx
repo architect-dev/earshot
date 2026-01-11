@@ -3,7 +3,7 @@ import { type DocumentSnapshot, type Timestamp } from 'firebase/firestore';
 import { getUserConversations } from '@/services/conversations';
 import { getConversationMessages } from '@/services/messages';
 import { subscribeToQuery, COLLECTIONS, where, orderBy, limit } from '@/services/firebase/firestore';
-import { type Conversation, type Message, type QuotedContent } from '@/types';
+import { type PendingMessage, type Conversation, type Message } from '@/types';
 import { GetProfileByIdFn, type Profile } from '@/types/profile';
 import { useAuth } from './AuthContext';
 import { useFriends } from './FriendsContext';
@@ -20,20 +20,6 @@ export interface ConversationMessages {
   hasMore: boolean;
   lastFetchedAt: Timestamp;
 }
-
-// Pending message (before it's persisted to Firestore)
-export interface PendingMessage {
-  pendingId: string; // Format: pending-${userId}-${timestampMs}
-  conversationId: string;
-  senderId: string;
-  type: 'text' | 'photo';
-  content?: string;
-  mediaUri?: string;
-  quotedContent?: QuotedContent;
-  createdAt: Date;
-  status: 'sending' | 'failed';
-}
-
 // Helper function to enrich a conversation with friend data
 function enrichConversation(conv: Conversation, getProfileById: GetProfileByIdFn): EnrichedConversation {
   const participantProfiles: Profile[] = [];

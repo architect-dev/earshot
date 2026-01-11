@@ -7,45 +7,12 @@ import { ScreenContainer, Text, Avatar } from '@/components/ui';
 import { MessageBubble, MessageInput, MessageContextModal } from '@/components/messages';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useConversations, useConversation, type PendingMessage } from '@/contexts/ConversationsContext';
-import { createMessage, markMessagesAsRead } from '@/services/messages';
+import { useConversations, useConversation } from '@/contexts/ConversationsContext';
+import { markMessagesAsRead } from '@/services/messages';
 import { getDocument } from '@/services/firebase/firestore';
 import { COLLECTIONS } from '@/services/firebase/firestore';
-import { uploadFile, getMessageMediaPath } from '@/services/firebase/storage';
-import { getErrorMessage } from '@/utils/errors';
-import { type Message, type User, type QuotedContent } from '@/types';
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-
-const MAX_DIMENSION = 1440;
-const JPEG_QUALITY = 0.8;
-
-// Process image for message (similar to posts but simpler - no crop data)
-async function processMessageImage(uri: string): Promise<Blob> {
-  // First, get the original dimensions
-  const contextForDimensions = ImageManipulator.manipulate(uri);
-  const original = await contextForDimensions.renderAsync();
-
-  // Calculate resize dimensions maintaining aspect ratio
-  let resizeWidth: number;
-  let resizeHeight: number;
-
-  if (original.width > original.height) {
-    resizeWidth = MAX_DIMENSION;
-    resizeHeight = Math.round((original.height / original.width) * MAX_DIMENSION);
-  } else {
-    resizeHeight = MAX_DIMENSION;
-    resizeWidth = Math.round((original.width / original.height) * MAX_DIMENSION);
-  }
-
-  // Create a new context for the actual manipulation
-  const context = ImageManipulator.manipulate(uri);
-  const resized = context.resize({ width: resizeWidth, height: resizeHeight });
-  const rendered = await resized.renderAsync();
-  const result = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: JPEG_QUALITY });
-
-  const response = await fetch(result.uri);
-  return response.blob();
-}
+import { type Message, type User, type QuotedContent, type PendingMessage, type MessageWithReactions } from '@/types';
+import { useSendMessage } from '@/hooks/useSendMessage';
 
 export default function ConversationScreen() {
   const { theme } = useTheme();
@@ -63,16 +30,14 @@ export default function ConversationScreen() {
     loading,
     loadMoreMessages: loadMore,
     pendingMessages,
-    addPendingMessage,
-    updatePendingMessageStatus,
     onConversationClosed,
   } = useConversation(conversationId);
+  const { sendMessage, sendingMessage } = useSendMessage(user?.uid, conversationId);
 
   // UI-specific state
-  const [sending, setSending] = useState(false);
   const [quotedContent, setQuotedContent] = useState<QuotedContent | null>(null);
   const [contextModalVisible, setContextModalVisible] = useState(false);
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<MessageWithReactions | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
   // Store user profiles for display
@@ -147,59 +112,11 @@ export default function ConversationScreen() {
 
   // Send message
   const handleSend = useCallback(
-    async (content: string, mediaUri?: string) => {
-      if (!user || !conversationId || sending) return;
-
-      const pendingId = `pending-${user.uid}-${Date.now()}`;
-      const pendingMessage: PendingMessage = {
-        pendingId,
-        conversationId,
-        senderId: user.uid,
-        type: mediaUri ? 'photo' : 'text',
-        content: content || undefined,
-        mediaUri,
-        quotedContent: quotedContent || undefined,
-        createdAt: new Date(),
-        status: 'sending',
-      };
-
-      // Add to pending messages immediately (synchronous)
-      addPendingMessage(pendingMessage);
-      setSending(true);
-      setQuotedContent(null); // Clear quote after sending
-
-      try {
-        let mediaUrl: string | undefined;
-
-        // Upload photo if provided
-        if (mediaUri) {
-          const blob = await processMessageImage(mediaUri);
-          // Use pendingId for storage path (will be replaced with real messageId later)
-          const storagePath = getMessageMediaPath(conversationId, pendingId, 'jpg');
-          mediaUrl = await uploadFile(storagePath, blob, { contentType: 'image/jpeg' });
-        }
-
-        // Create message with pendingId (will arrive via real-time subscription)
-        await createMessage({
-          conversationId,
-          senderId: user.uid,
-          type: mediaUri ? 'photo' : 'text',
-          content: content || undefined,
-          mediaUrl,
-          quotedContent: quotedContent || undefined,
-          pendingId,
-        });
-
-        // Pending message will be removed automatically when real message arrives via subscription
-      } catch (err) {
-        // Mark as failed
-        updatePendingMessageStatus(pendingId, 'failed');
-        Alert.alert('Error', getErrorMessage(err));
-      } finally {
-        setSending(false);
-      }
+    async (content: string, quotedContent: QuotedContent | null, mediaUri?: string) => {
+      const success = await sendMessage(content, quotedContent, mediaUri);
+      if (success) setQuotedContent(null);
     },
-    [user, conversationId, sending, quotedContent, addPendingMessage, updatePendingMessageStatus]
+    [sendMessage]
   );
 
   // Get user profile for a participant
@@ -216,17 +133,120 @@ export default function ConversationScreen() {
   );
 
   // Combine messages and pending messages for display
-  // Messages are already sorted newest first (from getConversationMessages)
-  // We'll add pending messages at the beginning (newest)
+  // Stitch reactions, add time breaks, and "New Messages" divider
   const displayMessages = useMemo(() => {
-    if (!conversationId) return [];
+    if (!conversationId || !user) return [];
 
-    const allMessages: Array<Message | PendingMessage> = [...messages];
-    // Add pending messages at the beginning (most recent)
+    // 1. Separate regular messages and reactions
+    const regularMessages = messages.filter((msg) => msg.type !== 'reaction');
+    const reactionMessages = messages.filter((msg) => msg.type === 'reaction' && msg.deletedAt == null);
+    const pendingReactions = pendingMessages.filter((msg) => msg.type === 'reaction');
+
+    // 2. Group reactions by target message ID
+    const reactionsByTarget = new Map<string, (Message | PendingMessage)[]>();
+    [...reactionMessages, ...pendingReactions].forEach((reaction) => {
+      const targetId = reaction.quotedContent?.type === 'message' ? reaction.quotedContent.messageId : null;
+      if (targetId) {
+        const existing = reactionsByTarget.get(targetId) || [];
+        reactionsByTarget.set(targetId, [...existing, reaction]);
+      }
+    });
+
+    // 3. Convert to chronological order (oldest first) for stitching
+    const chronologicalMessages = [...regularMessages].reverse();
+
+    // 5. Stitch reactions and pending reactions after their target messages
+    const stitched: Array<MessageWithReactions> = [];
+    chronologicalMessages.forEach((message) => {
+      stitched.push({ ...message, reactions: reactionsByTarget.get(message.id) || [] });
+    });
+
+    // 5. Insert time breaks and "New Messages" divider (only for stitched messages, not pending)
+    // const withDividers: Array<Message | DividerMessage> = [];
+    // const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    // let newMessagesDividerInserted = false;
+
+    // for (let i = 0; i < stitched.length; i++) {
+    //   const currentMessage = stitched[i];
+    //   const currentTimestamp = currentMessage.createdAt;
+    //   const currentDate = currentTimestamp instanceof Date ? currentTimestamp : currentTimestamp.toDate();
+    //   const isCurrentUnread = currentMessage.senderId !== user.uid && !currentMessage.readBy.includes(user.uid);
+
+    //   // Check if we need to insert "New Messages" divider
+    //   // Insert between last unread message and first read message
+    //   if (!newMessagesDividerInserted && i > 0) {
+    //     const previousMessage = stitched[i - 1];
+    //     const previousIsUnread = previousMessage.senderId !== user.uid && !previousMessage.readBy.includes(user.uid);
+
+    //     // If previous was unread and current is read, insert divider
+    //     if (previousIsUnread && !isCurrentUnread) {
+    //       const newMessagesDivider: DividerMessage = {
+    //         type: 'divider',
+    //         dividerType: 'newMessages',
+    //         id: `divider-newMessages`,
+    //         label: 'New Messages',
+    //       };
+    //       withDividers.push(newMessagesDivider);
+    //       newMessagesDividerInserted = true;
+    //     }
+    //   }
+
+    //   // Add current message
+    //   withDividers.push(currentMessage);
+
+    //   // Check if we need to insert time break after this message
+    //   if (i < stitched.length - 1) {
+    //     const nextMessage = stitched[i + 1];
+    //     const nextTimestamp = nextMessage.createdAt;
+    //     const nextDate = nextTimestamp instanceof Date ? nextTimestamp : nextTimestamp.toDate();
+
+    //     // Calculate time difference
+    //     const timeDiff = Math.abs(currentDate.getTime() - nextDate.getTime());
+    //     const isLessThan24Hours = timeDiff < MS_PER_DAY;
+    //     console.log({
+    //       timeDiff,
+    //       isLessThan24Hours,
+    //       isMoreThanOneHour: isMoreThanOneHour(currentTimestamp, nextTimestamp),
+    //       isDifferentDay: isDifferentDay(currentTimestamp, nextTimestamp),
+    //     });
+
+    //     let shouldInsertTimeBreak = false;
+
+    //     if (isLessThan24Hours) {
+    //       // If messages are < 24hrs old: insert break if time difference > 1 hour
+    //       shouldInsertTimeBreak = isMoreThanOneHour(currentTimestamp, nextTimestamp);
+    //     } else {
+    //       // If messages are >= 24hrs old: insert break when days are different
+    //       shouldInsertTimeBreak = isDifferentDay(currentTimestamp, nextTimestamp);
+    //     }
+
+    //     if (shouldInsertTimeBreak) {
+    //       // Use the next message's timestamp for the break label
+    //       const timeBreak: DividerMessage = {
+    //         type: 'divider',
+    //         dividerType: 'time',
+    //         id: `divider-time-${nextMessage.id}`,
+    //         timestamp: nextTimestamp instanceof Date ? undefined : nextTimestamp,
+    //         label: formatTimeBreak(nextTimestamp),
+    //       };
+    //       withDividers.push(timeBreak);
+    //     }
+    //   }
+    // }
+
+    // 6. Reverse back to reverse chronological (for inverted FlatList)
+    const reversedWithDividers = stitched.reverse();
+
+    // 7. Add pending messages at the beginning (they're newest, so add after reversing)
+    const allMessages: Array<MessageWithReactions> = [...reversedWithDividers];
     for (const pending of pendingMessages) {
+      // Skip pending reactions
+      if (pending.type === 'reaction') continue;
+
       // Convert pending to message-like object for display
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const pendingAsMessage: any = {
+        isPending: true,
         id: pending.pendingId,
         conversationId: pending.conversationId,
         senderId: pending.senderId,
@@ -238,12 +258,13 @@ export default function ConversationScreen() {
         readBy: [],
         deletedAt: null,
         status: pending.status,
+        reactions: [],
       };
       allMessages.unshift(pendingAsMessage);
     }
 
     return allMessages;
-  }, [messages, conversationId, pendingMessages]);
+  }, [messages, conversationId, pendingMessages, user]);
 
   // Get other user info (for DMs)
   const otherUser = useMemo(() => {
@@ -278,7 +299,7 @@ export default function ConversationScreen() {
   }, [conversation, otherUser]);
 
   // Handle message context modal
-  const handleMessageLongPress = useCallback((message: Message) => {
+  const handleMessageLongPress = useCallback((message: MessageWithReactions) => {
     setSelectedMessage(message);
     setContextModalVisible(true);
   }, []);
@@ -384,27 +405,36 @@ export default function ConversationScreen() {
       <FlatList
         ref={flatListRef}
         data={displayMessages}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => {
+          // Handle pending reactions
+          if ('isPending' in item && item.isPending) {
+            return (item as PendingMessage).pendingId;
+          }
+          // Handle regular messages and pending messages
+          return item.id;
+        }}
         renderItem={({ item }) => {
-          const isOwn = item.senderId === user?.uid;
-          const isPending = 'status' in item && item.status !== 'sent';
+          // Handle regular messages and pending messages
+          const message = item as MessageWithReactions | PendingMessage;
+          const isOwn = message.senderId === user?.uid;
+          const isPending = 'isPending' in message && message.isPending;
           const opacity = isPending ? 0.75 : 1;
 
           // Get sender info for group chats
           let senderName: string | undefined;
           let senderAvatar: string | null | undefined;
           if (!isOwn && conversation.type === 'group') {
-            const senderProfile = getUserProfile(item.senderId);
+            const senderProfile = getUserProfile(message.senderId);
             senderName = senderProfile?.fullName;
             senderAvatar = senderProfile?.profilePhotoUrl;
           }
 
-          const messageId = 'id' in item ? item.id : item.pendingId;
+          const messageId = 'id' in message ? message.id : message.pendingId;
           const isHighlighted = highlightedMessageId === messageId;
 
           return (
             <MessageBubble
-              message={item as Message}
+              message={message as MessageWithReactions}
               isOwn={isOwn}
               senderName={senderName}
               senderAvatar={senderAvatar}
@@ -412,7 +442,7 @@ export default function ConversationScreen() {
               isHighlighted={isHighlighted}
               getUserProfile={getUserProfile}
               getMessage={getMessageById}
-              onLongPress={() => handleMessageLongPress(item as Message)}
+              onLongPress={() => handleMessageLongPress(message as MessageWithReactions)}
               onQuotedPostPress={(postId) => router.push(`/post/${postId}`)}
               onQuotedMessagePress={handleQuotedMessagePress}
             />
@@ -439,7 +469,7 @@ export default function ConversationScreen() {
         onSend={handleSend}
         quotedContent={quotedContent}
         onClearQuote={() => setQuotedContent(null)}
-        disabled={sending}
+        disabled={sendingMessage}
       />
       <MessageContextModal
         visible={contextModalVisible}
@@ -458,6 +488,20 @@ export default function ConversationScreen() {
 }
 
 const styles = StyleSheet.create({
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    paddingHorizontal: 8,
+  },
   container: {
     flex: 1,
   },

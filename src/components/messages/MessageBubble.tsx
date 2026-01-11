@@ -3,12 +3,12 @@ import { View, Pressable, StyleSheet, Image } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor } from 'react-native-reanimated';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text, Avatar } from '@/components/ui';
-import { type Message } from '@/types';
+import { PendingMessage, type Message, type MessageWithReactions } from '@/types';
 import { QuotedContent } from './QuotedContent';
 import { FontAwesome6 } from '@expo/vector-icons';
 
 interface MessageBubbleProps {
-  message: Message;
+  message: MessageWithReactions;
   isOwn: boolean;
   senderName?: string; // For group chats
   senderAvatar?: string | null; // For group chats
@@ -76,11 +76,6 @@ export function MessageBubble({
     };
   });
 
-  // Don't render reaction messages (they're handled separately)
-  if (message.type === 'reaction') {
-    return null;
-  }
-
   // Deleted message placeholder
   if (message.deletedAt) {
     return (
@@ -140,6 +135,28 @@ export function MessageBubble({
     }
   };
 
+  const getReactionIsPending = (reaction: Message | PendingMessage): reaction is PendingMessage => {
+    return 'isPending' in reaction && reaction.isPending;
+  };
+  const getReactionId = (reaction: Message | PendingMessage) => {
+    return getReactionIsPending(reaction) ? reaction.pendingId : reaction.id;
+  };
+
+  const renderReactions = () => {
+    return (
+      <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
+        {message.reactions.map((reaction) => (
+          <View
+            key={getReactionId(reaction)}
+            style={[styles.reactionBubble, { opacity: getReactionIsPending(reaction) ? 0.3 : 1 }]}
+          >
+            <Text size="sm">{reaction.reactionType === 'heart' ? '❤️' : '👍'}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <Pressable
       style={[styles.container, isOwn ? styles.ownContainer : styles.otherContainer, { opacity }]}
@@ -190,6 +207,9 @@ export function MessageBubble({
       >
         {/* Main content */}
         {renderContent()}
+
+        {/* Reactions */}
+        {renderReactions()}
 
         {/* Timestamp and read receipt */}
         {/* <View style={styles.footer}>
@@ -287,4 +307,5 @@ const styles = StyleSheet.create({
   readReceipt: {
     marginLeft: 4,
   },
+  reactionBubble: {},
 });

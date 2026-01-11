@@ -22,6 +22,24 @@ export interface Message {
   deletedAt?: Timestamp | null; // Timestamp when message was deleted (null if not deleted)
 }
 
+export interface PendingMessage {
+  isPending: true;
+  pendingId: string; // Format: pending-${userId}-${timestampMs}
+  conversationId: string;
+  senderId: string;
+  type: 'text' | 'photo' | 'reaction';
+  content?: string;
+  reactionType?: ReactionType;
+  mediaUri?: string;
+  quotedContent?: QuotedContent;
+  createdAt: Date;
+  status: 'sending' | 'failed';
+}
+
+export interface MessageWithReactions extends Message {
+  reactions: (Message | PendingMessage)[];
+}
+
 // For creating a new message
 export interface CreateMessageData {
   conversationId: string;
@@ -40,4 +58,15 @@ export interface CreateMessageData {
 export interface UpdateMessageData {
   readBy?: string[];
   deletedAt?: Timestamp | null;
+}
+
+// Divider messages for UI breaks
+export type DividerType = 'time' | 'newMessages';
+
+export interface DividerMessage {
+  type: 'divider';
+  dividerType: DividerType;
+  id: string;
+  timestamp?: Timestamp;
+  label: string;
 }

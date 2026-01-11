@@ -8,7 +8,7 @@ import { type QuotedContent } from '@/types';
 import { QuotedContent as QuotedContentComponent } from './QuotedContent';
 
 interface MessageInputProps {
-  onSend: (content: string, mediaUri?: string) => void;
+  onSend: (content: string, quotedContent: QuotedContent | null, mediaUri?: string) => void;
   quotedContent?: QuotedContent | null;
   onClearQuote?: () => void;
   disabled?: boolean;
@@ -20,7 +20,7 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
 
   const handleSend = () => {
     if (!text.trim() && !quotedContent) return;
-    onSend(text.trim());
+    onSend(text.trim(), quotedContent || null);
     setText('');
   };
 
@@ -38,7 +38,7 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
     });
 
     if (!result.canceled && result.assets[0]) {
-      onSend('', result.assets[0].uri);
+      onSend('', quotedContent || null, result.assets[0].uri);
     }
   };
 
