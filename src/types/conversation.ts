@@ -41,6 +41,7 @@ export interface Conversation {
   latestMessage: Message | null; // Latest message in the conversation (cached)
   unreadCounts: Record<string, number>; // userId -> unread count
   mutedBy: string[]; // Array of user IDs who have muted this conversation
+  typingTimestamp?: Record<string, Timestamp>; // userId -> last typing timestamp
 }
 
 // For creating a new conversation
@@ -59,4 +60,5 @@ export interface UpdateConversationData {
   latestMessage?: Message | null;
   unreadCounts?: Record<string, number>;
   mutedBy?: string[];
+  typingTimestamp?: Record<string, Timestamp>;
 }

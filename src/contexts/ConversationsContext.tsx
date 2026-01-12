@@ -11,6 +11,7 @@ import { useFriends } from './FriendsContext';
 // Enriched conversation with participant profile data
 export interface EnrichedConversation extends Conversation {
   participantProfiles: Profile[];
+  typing: string[]; // Computed: array of user IDs currently typing (filtered from typingTimestamp)
 }
 
 // Messages for a conversation
@@ -30,9 +31,25 @@ function enrichConversation(conv: Conversation, getProfileById: GetProfileByIdFn
     if (profile != null) participantProfiles.push(profile);
   }
 
+  // console.log('enrichConversation', conv.participants, participantProfiles);
+
+  // Compute initial typing array (filter stale typing states)
+  const now = Math.round(Date.now() / 1000);
+  const STALE_TYPING_SECONDS = 4;
+  const typing: string[] = conv.typingTimestamp
+    ? Object.entries(conv.typingTimestamp)
+        .filter(([_userId, timestamp]) => {
+          if (timestamp == null) return false;
+          const age = now - timestamp.seconds;
+          return age <= STALE_TYPING_SECONDS;
+        })
+        .map(([userId]) => userId)
+    : [];
+
   return {
     ...conv,
     participantProfiles,
+    typing,
   };
 }
 
@@ -229,14 +246,23 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
 
     conversationsUnsubscribeRef.current = unsubscribe;
 
+    // 1-second interval to filter stale typing states
+    const typingInterval = setInterval(() => {
+      setConversations((prev) => {
+        return prev.map((conv) => {
+          return enrichConversation(conv, getProfileById);
+        });
+      });
+    }, 1000); // Every 1 second
+
     return () => {
       if (conversationsUnsubscribeRef.current) {
         conversationsUnsubscribeRef.current();
         conversationsUnsubscribeRef.current = null;
       }
+      clearInterval(typingInterval);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, getProfileById]);
 
   // Memoize conversation IDs - only changes when IDs actually change (not when conversation data updates)
   // Create a stable sorted array that only changes when the actual IDs change

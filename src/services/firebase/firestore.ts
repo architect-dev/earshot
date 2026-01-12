@@ -16,6 +16,7 @@ import {
   runTransaction,
   writeBatch,
   arrayUnion,
+  deleteField,
   type DocumentData,
   type QueryConstraint,
   type DocumentReference,
@@ -225,4 +226,14 @@ export function createBatch() {
 }
 
 // Re-export commonly used Firestore functions for convenience
-export { where, orderBy, limit, startAfter, serverTimestamp, Timestamp, arrayUnion, type DocumentSnapshot };
+export {
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  serverTimestamp,
+  Timestamp,
+  arrayUnion,
+  deleteField,
+  type DocumentSnapshot,
+};

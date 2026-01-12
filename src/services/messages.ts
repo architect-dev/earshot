@@ -2,7 +2,6 @@ import {
   COLLECTIONS,
   getDocument,
   updateDocument,
-  deleteDocument,
   queryDocumentsPaginated,
   queryDocuments,
   where,
@@ -14,8 +13,9 @@ import {
   arrayUnion,
   getDocRef,
   type DocumentSnapshot,
+  deleteField,
 } from './firebase/firestore';
-import { type Message, type CreateMessageData, type ReactionType, type QuotedMessage } from '@/types';
+import { type Message, type CreateMessageData, type ReactionType } from '@/types';
 import { updateConversation, getConversation } from './conversations';
 
 const MESSAGES_PAGE_SIZE = 50;
@@ -148,6 +148,9 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
       }
     });
     conversationUpdates.unreadCounts = updatedUnreadCounts;
+
+    // Update typing state
+    conversationUpdates[`typingTimestamp.${data.senderId}`] = deleteField();
 
     // Update conversation
     transaction.update(conversationRef, conversationUpdates);
@@ -290,60 +293,6 @@ export async function deleteMessage(messageId: string, userId: string): Promise<
     voiceUrl: null,
     quotedContent: null, // Also remove quoted content
   });
-}
-
-/**
- * Toggle a reaction to a message (e.g., heart)
- * Creates a reaction message if not present, deletes it if present (toggle behavior)
- */
-export async function toggleMessageReaction(
-  conversationId: string,
-  targetMessageId: string,
-  userId: string,
-  reactionType: ReactionType
-): Promise<void> {
-  // Validate target message exists and is in the same conversation
-  const targetMessage = await getMessage(targetMessageId);
-  if (!targetMessage) {
-    throw new Error('Target message not found');
-  }
-
-  if (targetMessage.conversationId !== conversationId) {
-    throw new Error('Target message must be in the same conversation');
-  }
-
-  // Don't allow reacting to deleted messages
-  if (targetMessage.deletedAt) {
-    throw new Error('Cannot react to deleted messages');
-  }
-
-  // Check if user already has this reaction
-  const existingReactionId = await hasUserReacted(conversationId, targetMessageId, userId, reactionType);
-
-  if (existingReactionId) {
-    // Delete the existing reaction message
-    await deleteDocument(COLLECTIONS.MESSAGES, existingReactionId);
-  } else {
-    // Create new reaction message
-    // Get sender info for quoted message preview (can be empty/minimal)
-    const quotedMessage: QuotedMessage = {
-      type: 'message',
-      messageId: targetMessageId,
-      preview: {
-        // Preview can be empty as per requirements
-        senderName: '', // Will be populated by UI if needed
-        senderUsername: '',
-      },
-    };
-
-    await createMessage({
-      conversationId,
-      senderId: userId,
-      type: 'reaction',
-      reactionType,
-      quotedContent: quotedMessage,
-    });
-  }
 }
 
 /**

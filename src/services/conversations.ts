@@ -218,3 +218,15 @@ export async function toggleMuteConversation(conversationId: string, userId: str
 
   await updateConversation(conversationId, { mutedBy: updatedMutedBy });
 }
+
+/**
+ * Update typing state for a user in a conversation
+ * @param conversationId - The conversation ID
+ * @param userId - The user ID who is typing
+ * @param isTyping - Whether the user is typing (true) or stopped (false)
+ */
+export async function markAsTyping(conversationId: string, userId: string): Promise<void> {
+  await updateDocument(COLLECTIONS.CONVERSATIONS, conversationId, {
+    [`typingTimestamp.${userId}`]: serverTimestamp(),
+  });
+}

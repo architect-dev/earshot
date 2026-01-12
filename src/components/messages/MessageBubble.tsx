@@ -11,6 +11,7 @@ interface MessageBubbleProps {
   message: MessageWithReactions;
   senderProfile: Profile;
   isOwn: boolean;
+  isGroup: boolean;
   onPress?: () => void;
   onLongPress?: () => void;
   onQuotedPostPress?: (postId: string) => void;
@@ -24,6 +25,7 @@ export function MessageBubble({
   message,
   senderProfile,
   isOwn,
+  isGroup,
   onPress,
   onLongPress,
   onQuotedPostPress,
@@ -167,7 +169,7 @@ export function MessageBubble({
       onLongPress={onLongPress}
     >
       {/* Group chat: show sender avatar and name */}
-      {!isOwn && senderProfile.fullName && (
+      {!isOwn && isGroup && senderProfile.fullName && (
         <View style={styles.senderInfo}>
           <Avatar source={senderProfile.profilePhotoUrl} name={senderProfile.fullName} size="xs" />
           {senderProfile.fullName && (

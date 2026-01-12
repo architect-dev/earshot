@@ -187,6 +187,34 @@ export default function ConversationScreen() {
       allMessages.unshift(pendingAsMessage);
     }
 
+    // Insert typing indicator at the beginning
+    if (conversation?.typing && conversation.typing.length > 0) {
+      // Filter out current user from typing list
+      const otherTypingUsers = conversation.typing.filter((userId) => userId !== user.uid);
+
+      if (otherTypingUsers.length > 0) {
+        // Get typing user profiles for display
+        const typingProfiles = otherTypingUsers
+          .map((userId) => conversation.participantProfiles.find((p) => p.id === userId))
+          .filter((p): p is NonNullable<typeof p> => p != null);
+
+        let typingLabel: string;
+        if (typingProfiles.length === 1) {
+          typingLabel = `${typingProfiles[0].fullName} is typing...`;
+        } else if (typingProfiles.length === 2) {
+          typingLabel = `${typingProfiles[0].fullName} and ${typingProfiles[1].fullName} are typing...`;
+        } else {
+          typingLabel = `${typingProfiles.length} people are typing...`;
+        }
+
+        allMessages.unshift({
+          type: 'divider',
+          id: 'divider-typing',
+          label: typingLabel,
+        });
+      }
+    }
+
     // 8. Insert dividers (date breaks and "New Messages" divider)
     const withDividers: Array<MessageWithReactions | DividerMessage> = [];
     let newMessagesDividerInserted = false;
@@ -262,7 +290,7 @@ export default function ConversationScreen() {
     }
 
     return withDividers;
-  }, [messages, conversationId, pendingMessages, user, moreMessagesLoading]);
+  }, [messages, conversationId, pendingMessages, user, moreMessagesLoading, conversation]);
 
   // Get other user info (for DMs)
   const otherUser = useMemo(() => {
@@ -458,6 +486,7 @@ export default function ConversationScreen() {
                 message={message as MessageWithReactions}
                 senderProfile={senderProfile}
                 isOwn={isOwn}
+                isGroup={conversation?.type === 'group'}
                 opacity={opacity}
                 isHighlighted={isHighlighted}
                 onLongPress={() => handleMessageLongPress(message as MessageWithReactions)}
@@ -510,6 +539,8 @@ export default function ConversationScreen() {
         </Animated.View>
       </View>
       <MessageInput
+        conversationId={conversationId || ''}
+        userId={user?.uid || ''}
         onSend={handleSend}
         quotedContent={quotedContent}
         onClearQuote={() => setQuotedContent(null)}

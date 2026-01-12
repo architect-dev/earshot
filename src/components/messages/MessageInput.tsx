@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { View, StyleSheet, Pressable, Alert } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -7,23 +7,65 @@ import * as ImagePicker from 'expo-image-picker';
 import { type QuotedContent } from '@/types';
 import { QuotedContent as QuotedContentComponent } from './QuotedContent';
 import { useFriends } from '@/contexts/FriendsContext';
+import { markAsTyping } from '@/services/conversations';
 
 interface MessageInputProps {
+  conversationId: string;
+  userId: string;
   onSend: (content: string, quotedContent: QuotedContent | null, mediaUri?: string) => void;
   quotedContent?: QuotedContent | null;
   onClearQuote?: () => void;
   disabled?: boolean;
 }
 
-export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = false }: MessageInputProps) {
+export function MessageInput({
+  conversationId,
+  userId,
+  onSend,
+  quotedContent,
+  onClearQuote,
+  disabled = false,
+}: MessageInputProps) {
   const { theme } = useTheme();
   const [text, setText] = useState('');
   const { getProfileById } = useFriends();
   const quotedSenderProfile = quotedContent ? getProfileById(quotedContent.senderId) : null;
 
+  // Typing state management with rate limiting
+  const lastTypingUpdateRef = useRef<number>(0);
+  const isTypingRef = useRef<boolean>(false);
+
+  // Update typing state (rate-limited to every 2 seconds)
+  const updateTyping = useCallback(
+    (isTyping: boolean) => {
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastTypingUpdateRef.current;
+
+      // Rate limit: only update if first keystroke OR 2+ seconds since last update
+      if (!isTypingRef.current || isTyping || timeSinceLastUpdate >= 2000) {
+        markAsTyping(conversationId, userId).catch(() => {
+          // Silently fail - typing indicators are not critical
+        });
+        lastTypingUpdateRef.current = now;
+        isTypingRef.current = isTyping;
+      }
+    },
+    [conversationId, userId]
+  );
+
+  const handleTextChange = (newText: string) => {
+    setText(newText);
+    // Update typing state (rate-limited)
+    if (newText.trim().length > 0) {
+      updateTyping(true);
+    }
+  };
+
   const handleSend = () => {
     if (!text.trim() && !quotedContent) return;
+
     onSend(text.trim(), quotedContent || null);
+    isTypingRef.current = false;
     setText('');
   };
 
@@ -68,7 +110,7 @@ export function MessageInput({ onSend, quotedContent, onClearQuote, disabled = f
           <TextInput
             placeholder=""
             value={text}
-            onChangeText={setText}
+            onChangeText={handleTextChange}
             multiline
             style={[
               styles.input,
