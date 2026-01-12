@@ -274,7 +274,7 @@
     - [ ] Show visual feedback during swipe (message slides, reply indicator)
     - [ ] On swipe completion, quote the message and focus input
     - [ ] Pre-fill message input with quoted message reference
-  - [ ] Typing indicators (see details below)
+  - [x] Typing indicators (see details below)
   - [x] Quoted content display:
     - [x] Support quoted posts (from PostInteractionModal)
     - [x] Support quoted messages (text, photo, voice)
@@ -361,15 +361,15 @@
   - [ ] If not loaded, fetch message with context (10 messages before/after) - TODO
   - [ ] Merge context messages into existing list - TODO
   - [ ] Handle edge cases: deleted quoted message, network failure, very old messages - TODO
-- [ ] Typing indicators:
-  - [ ] Update typing state on text input (debounced, 500ms)
-  - [ ] Clear typing state on message send or input blur
-  - [ ] Store typing state in Firestore (conversations/{id}/typing/{userId})
-  - [ ] Listen to typing updates from other participants
-  - [ ] Display "User is typing..." below input area
-  - [ ] Handle multiple users typing in group chats ("Alice and Bob are typing...")
-  - [ ] Auto-cleanup typing state after 10 seconds of inactivity
-  - [ ] Handle network failures gracefully
+- [x] Typing indicators:
+  - [x] Update typing state on text input (debounced, 500ms)
+  - [x] Clear typing state on message send or input blur
+  - [x] Store typing state in Firestore (conversations/{id}/typing/{userId})
+  - [x] Listen to typing updates from other participants
+  - [x] Display "User is typing..." below input area
+  - [x] Handle multiple users typing in group chats ("Alice and Bob are typing...")
+  - [x] Auto-cleanup typing state after 10 seconds of inactivity
+  - [x] Handle network failures gracefully
 - [x] Add scroll to bottom button
 - [x] Automatically scroll to bottom on message send
 
