@@ -36,6 +36,7 @@ export function MessageBubble({
   const hasQuotedContent = !!message.quotedContent;
   const isHeartOnPost = message.quotedContent?.type === 'post' && message.type === 'heart';
   const isCommentOnPost = message.quotedContent?.type === 'post' && message.type === 'comment';
+  const hasReactions = message.reactions.length > 0;
 
   // Animate highlight when isHighlighted changes
   useEffect(() => {
@@ -204,10 +205,14 @@ export function MessageBubble({
           isHeartOnPost && styles.heartOnPostBubble,
           animatedBackgroundStyle,
           hasQuotedContent && styles.bubbleWithQuote,
+          hasReactions && styles.bubbleWithReactions,
         ]}
       >
         {/* Main content */}
         {renderContent()}
+
+        {/* Reactions */}
+        {renderReactions()}
 
         {/* Timestamp and read receipt */}
         {/* <View style={styles.footer}>
@@ -221,9 +226,6 @@ export function MessageBubble({
           )}
         </View> */}
       </Animated.View>
-
-      {/* Reactions */}
-      {renderReactions()}
     </Pressable>
   );
 }
@@ -251,9 +253,13 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   bubble: {
+    position: 'relative',
     maxWidth: '75%',
     padding: 12,
     borderRadius: 0, // Sharp corners
+  },
+  bubbleWithReactions: {
+    marginBottom: 16, // Additional bottom padding when reactions are present
   },
   bubbleWithQuote: {
     paddingTop: 16, // Additional top padding when quoted
@@ -315,17 +321,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   reactionsContainer: {
+    position: 'absolute',
     flexDirection: 'row',
     gap: 4,
     flexWrap: 'wrap',
-    marginTop: -4,
+    bottom: -16,
   },
   ownReactionsContainer: {
     alignSelf: 'flex-start',
-    marginLeft: 8,
+    left: -16,
   },
   otherReactionsContainer: {
     alignSelf: 'flex-end',
-    marginRight: 8,
+    right: -16,
   },
 });
