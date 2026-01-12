@@ -48,6 +48,7 @@ interface ConversationsContextValue {
   getMessages: (conversationId: string) => ConversationMessages | undefined;
   loadMoreMessages: (conversationId: string) => Promise<void>;
   messagesLoading: Map<string, boolean>;
+  moreMessagesLoading: Map<string, boolean>;
   // Pending message methods
   addPendingMessage: (conversationId: string, pendingMessage: PendingMessage) => void;
   removePendingMessage: (conversationId: string, pendingId: string) => void;
@@ -72,6 +73,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
   const activeConversationIdRef = useRef<string | null>(null);
   const [messages, setMessages] = useState<Map<string, ConversationMessages>>(new Map());
   const [messagesLoading, setMessagesLoading] = useState<Map<string, boolean>>(new Map());
+  const [moreMessagesLoading, setMoreMessagesLoading] = useState<Map<string, boolean>>(new Map());
   const [pendingMessages, setPendingMessages] = useState<Map<string, PendingMessage[]>>(new Map());
 
   // Track subscriptions for cleanup
@@ -404,7 +406,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
       const existing = messages.get(conversationId);
       if (!existing || !existing.cursor || !existing.hasMore) return;
 
-      setMessagesLoading((prev) => {
+      setMoreMessagesLoading((prev) => {
         const newMap = new Map(prev);
         newMap.set(conversationId, true);
         return newMap;
@@ -429,7 +431,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
         // eslint-disable-next-line no-console
         console.error(`Error loading more messages for conversation ${conversationId}:`, err);
       } finally {
-        setMessagesLoading((prev) => {
+        setMoreMessagesLoading((prev) => {
           const newMap = new Map(prev);
           newMap.set(conversationId, false);
           return newMap;
@@ -524,6 +526,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
     getMessages,
     loadMoreMessages,
     messagesLoading,
+    moreMessagesLoading,
     addPendingMessage,
     removePendingMessage,
     getPendingMessages,
@@ -548,6 +551,7 @@ export function useConversation(conversationId: string | null | undefined) {
     getConversationById,
     getMessages,
     messagesLoading,
+    moreMessagesLoading: moreMessagesLoadingContext,
     loadMoreMessages,
     addPendingMessage: addPendingMessageContext,
     removePendingMessage: removePendingMessageContext,
@@ -560,6 +564,7 @@ export function useConversation(conversationId: string | null | undefined) {
   const messagesData = conversationId ? getMessages(conversationId) : undefined;
   const loading = conversationId ? (messagesLoading.get(conversationId) ?? false) : false;
   const pendingMessages = conversationId ? getPendingMessagesContext(conversationId) : [];
+  const moreMessagesLoading = conversationId ? (moreMessagesLoadingContext.get(conversationId) ?? false) : false;
 
   // Pending message functions bound to this conversationId
   const addPendingMessage = useCallback(
@@ -601,6 +606,7 @@ export function useConversation(conversationId: string | null | undefined) {
     cursor: messagesData?.cursor ?? null,
     hasMore: messagesData?.hasMore ?? false,
     loading,
+    moreMessagesLoading,
     loadMoreMessages: conversationId ? () => loadMoreMessages(conversationId) : undefined,
     // Pending message functions
     pendingMessages,

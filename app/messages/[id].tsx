@@ -33,6 +33,7 @@ export default function ConversationScreen() {
     messages,
     hasMore,
     loading,
+    moreMessagesLoading,
     loadMoreMessages: loadMore,
     pendingMessages,
     onConversationClosed,
@@ -230,8 +231,16 @@ export default function ConversationScreen() {
       }
     }
 
+    if (moreMessagesLoading) {
+      withDividers.push({
+        type: 'divider',
+        id: 'divider-loadingMore',
+        label: 'Loading more messages...',
+      });
+    }
+
     return withDividers;
-  }, [messages, conversationId, pendingMessages, user]);
+  }, [messages, conversationId, pendingMessages, user, moreMessagesLoading]);
 
   // Get other user info (for DMs)
   const otherUser = useMemo(() => {
