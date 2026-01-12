@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, FlatList, StyleSheet, Alert, ActivityIndicator, Pressable } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -45,8 +46,16 @@ export default function ConversationScreen() {
   const [contextModalVisible, setContextModalVisible] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<MessageWithReactions | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
+  const scrollToBottomOpacity = useSharedValue(0);
+
+  // Animated style for scroll to bottom button
+  const scrollToBottomAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: scrollToBottomOpacity.value,
+    pointerEvents: scrollToBottomOpacity.value > 0 ? ('auto' as const) : ('none' as const),
+  }));
 
   // Set active conversation when screen opens
   useEffect(() => {
@@ -103,6 +112,19 @@ export default function ConversationScreen() {
     async (content: string, quotedContent: QuotedContent | null, mediaUri?: string) => {
       sendMessage(content, quotedContent, mediaUri);
       setQuotedContent(null);
+
+      // Scroll to bottom after sending (small delay to ensure pending message is rendered)
+      setTimeout(() => {
+        if (flatListRef.current) {
+          // For inverted FlatList, scroll to index 0 (bottom) or use scrollToOffset(0)
+          try {
+            flatListRef.current.scrollToIndex({ index: 0, animated: true });
+          } catch {
+            // If scrollToIndex fails (e.g., item not rendered), use scrollToOffset
+            flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+          }
+        }
+      }, 100);
     },
     [sendMessage]
   );
@@ -380,76 +402,113 @@ export default function ConversationScreen() {
           </Text>
         </View>
       </View>
-      <FlatList
-        ref={flatListRef}
-        data={displayMessages}
-        keyExtractor={(item) => {
-          // Handle dividers
-          if ('type' in item && item.type === 'divider') {
-            return (item as DividerMessage).id;
-          }
-          // Handle pending messages
-          if ('isPending' in item && item.isPending) {
-            return (item as PendingMessage).pendingId;
-          }
-          // Handle regular messages
-          return (item as MessageWithReactions).id;
-        }}
-        renderItem={({ item }) => {
-          // Handle dividers
-          const isDivider = 'type' in item && item.type === 'divider';
-          if (isDivider) {
+      <View style={styles.messagesContainer}>
+        <FlatList
+          ref={flatListRef}
+          data={displayMessages}
+          onScroll={(event) => {
+            const offset = event.nativeEvent.contentOffset.y;
+            // For inverted FlatList, offset 0 is at bottom, higher offset = scrolled up
+            const shouldShow = offset >= 400;
+            if (shouldShow !== showScrollToBottom) {
+              setShowScrollToBottom(shouldShow);
+              scrollToBottomOpacity.value = withTiming(shouldShow ? 1 : 0, { duration: 200 });
+            }
+          }}
+          scrollEventThrottle={16}
+          keyExtractor={(item) => {
+            // Handle dividers
+            if ('type' in item && item.type === 'divider') {
+              return (item as DividerMessage).id;
+            }
+            // Handle pending messages
+            if ('isPending' in item && item.isPending) {
+              return (item as PendingMessage).pendingId;
+            }
+            // Handle regular messages
+            return (item as MessageWithReactions).id;
+          }}
+          renderItem={({ item }) => {
+            // Handle dividers
+            const isDivider = 'type' in item && item.type === 'divider';
+            if (isDivider) {
+              return (
+                <View style={styles.dividerContainer}>
+                  <Text size="sm" color="muted" style={{ fontStyle: 'italic' }}>
+                    {item.label}
+                  </Text>
+                </View>
+              );
+            }
+            // Handle regular messages and pending messages
+            const message = item as MessageWithReactions | PendingMessage;
+            const isOwn = message.senderId === user?.uid;
+            const isPending = 'isPending' in message && message.isPending;
+            const opacity = isPending ? 0.75 : 1;
+
+            // Get sender info for group chats
+            const senderProfile = conversation?.participantProfiles?.find((p) => p.id === message.senderId) || null;
+            if (!senderProfile) return null;
+
+            const messageId = 'id' in message ? message.id : message.pendingId;
+            const isHighlighted = highlightedMessageId === messageId;
+
             return (
-              <View style={styles.dividerContainer}>
-                <Text size="sm" color="muted" style={{ fontStyle: 'italic' }}>
-                  {item.label}
-                </Text>
-              </View>
+              <MessageBubble
+                message={message as MessageWithReactions}
+                senderProfile={senderProfile}
+                isOwn={isOwn}
+                opacity={opacity}
+                isHighlighted={isHighlighted}
+                onLongPress={() => handleMessageLongPress(message as MessageWithReactions)}
+                onQuotedPostPress={(postId) => router.push(`/post/${postId}`)}
+                onQuotedMessagePress={handleQuotedMessagePress}
+              />
             );
+          }}
+          inverted // Reverse chronological (newest at bottom)
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loading ? (
+              <View style={styles.loadingMore}>
+                <ActivityIndicator size="small" color={theme.colors.pine} />
+              </View>
+            ) : null
           }
-          // Handle regular messages and pending messages
-          const message = item as MessageWithReactions | PendingMessage;
-          const isOwn = message.senderId === user?.uid;
-          const isPending = 'isPending' in message && message.isPending;
-          const opacity = isPending ? 0.75 : 1;
-
-          // Get sender info for group chats
-          const senderProfile = conversation?.participantProfiles?.find((p) => p.id === message.senderId) || null;
-          if (!senderProfile) return null;
-
-          const messageId = 'id' in message ? message.id : message.pendingId;
-          const isHighlighted = highlightedMessageId === messageId;
-
-          return (
-            <MessageBubble
-              message={message as MessageWithReactions}
-              senderProfile={senderProfile}
-              isOwn={isOwn}
-              opacity={opacity}
-              isHighlighted={isHighlighted}
-              onLongPress={() => handleMessageLongPress(message as MessageWithReactions)}
-              onQuotedPostPress={(postId) => router.push(`/post/${postId}`)}
-              onQuotedMessagePress={handleQuotedMessagePress}
-            />
-          );
-        }}
-        inverted // Reverse chronological (newest at bottom)
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={
-          loading ? (
-            <View style={styles.loadingMore}>
-              <ActivityIndicator size="small" color={theme.colors.pine} />
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text color="muted">No messages yet</Text>
             </View>
-          ) : null
-        }
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text color="muted">No messages yet</Text>
-          </View>
-        }
-        contentContainerStyle={styles.listContent}
-      />
+          }
+          contentContainerStyle={styles.listContent}
+        />
+        {/* Scroll to bottom button */}
+        <Animated.View
+          style={[
+            styles.scrollToBottomButton,
+            {
+              backgroundColor: theme.colors.pine,
+            },
+            scrollToBottomAnimatedStyle,
+          ]}
+        >
+          <Pressable
+            onPress={() => {
+              if (flatListRef.current) {
+                try {
+                  flatListRef.current.scrollToIndex({ index: 0, animated: true });
+                } catch {
+                  flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+                }
+              }
+            }}
+            style={styles.scrollToBottomPressable}
+          >
+            <FontAwesome6 name="chevron-down" size={18} color={theme.colors.surface} />
+          </Pressable>
+        </Animated.View>
+      </View>
       <MessageInput
         onSend={handleSend}
         quotedContent={quotedContent}
@@ -473,6 +532,10 @@ export default function ConversationScreen() {
 }
 
 const styles = StyleSheet.create({
+  messagesContainer: {
+    flex: 1,
+    position: 'relative',
+  },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -482,6 +545,21 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  scrollToBottomButton: {
+    position: 'absolute',
+    bottom: 16, // Position above the input area
+    right: 8,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollToBottomPressable: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',

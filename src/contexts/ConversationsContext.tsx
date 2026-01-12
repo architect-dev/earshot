@@ -317,6 +317,8 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
                 const mergedMessages: Message[] = [];
                 const subscriptionMessageIds = new Set(subscriptionMessagesMap.keys());
 
+                // console.log('existing messages', existing.messages);
+
                 // Process cached messages
                 existing.messages.forEach((cachedMsg) => {
                   if (subscriptionMessageIds.has(cachedMsg.id)) {
@@ -328,6 +330,8 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
                   }
                 });
 
+                // console.log('mergedMessages', mergedMessages);
+
                 // Add any new messages from subscription that aren't in cache
                 subscriptionMessages.forEach((subMsg) => {
                   const existsInCache = existing.messages.some((msg) => msg.id === subMsg.id);
@@ -336,6 +340,8 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
                     mergedMessages.push(subMsg);
                   }
                 });
+
+                // console.log('mergedMessages after new messages', mergedMessages);
 
                 // Sort by createdAt desc (most recent first)
                 mergedMessages.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
@@ -404,7 +410,8 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
   const loadMoreMessages = useCallback(
     async (conversationId: string) => {
       const existing = messages.get(conversationId);
-      if (!existing || !existing.cursor || !existing.hasMore) return;
+      if ((!existing || !existing.cursor || !existing.hasMore || moreMessagesLoading.get(conversationId)) ?? false)
+        return;
 
       setMoreMessagesLoading((prev) => {
         const newMap = new Map(prev);
@@ -418,8 +425,14 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
           const newMap = new Map(prev);
           const existingData = newMap.get(conversationId);
           if (existingData) {
+            // Create a Set of existing message IDs to prevent duplicates
+            const existingMessageIds = new Set(existingData.messages.map((msg) => msg.id));
+
+            // Filter out any messages that already exist
+            const newMessages = result.messages.filter((msg) => !existingMessageIds.has(msg.id));
+
             newMap.set(conversationId, {
-              messages: [...existingData.messages, ...result.messages],
+              messages: [...existingData.messages, ...newMessages],
               cursor: result.lastDoc,
               hasMore: result.hasMore,
               lastFetchedAt: existingData.lastFetchedAt,
@@ -438,6 +451,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
         });
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [messages]
   );
 

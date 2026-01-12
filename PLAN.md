@@ -316,16 +316,16 @@
     - [x] Delete message (only for sender's own messages)
   - [x] Modal with sharp corners, flat design (consistent with app style)
   - [x] [CANCEL] button to close
-- [ ] Implement inline message reactions:
+- [x] Implement inline message reactions:
   - [x] Add 'reaction' as message type
   - [x] Reaction messages quote target message (quotedContent with empty preview)t 
   - [x] Support reaction types (starting with 'heart', extensible for future)
   - [x] Toggle reactions (create reaction message if not present, delete if present)
   - [x] Backend functions: toggleMessageReaction, getMessageReactions, getReactionCount, hasUserReacted
   - [x] Reaction messages don't update conversation lastMessageAt (don't bump to top)
-  - [ ] UI: Display reaction counts and indicators on message bubbles
-  - [ ] UI: Show which users have reacted (optional: tooltip or expandable list)
-  - [ ] UI: Filter out reaction messages from main message list (show as reactions on target messages)
+  - [x] UI: Display reaction counts and indicators on message bubbles
+  - [x] UI: Show which users have reacted (optional: tooltip or expandable list)
+  - [x] UI: Filter out reaction messages from main message list (show as reactions on target messages)
 - [x] Implement message quoting flow:
   - [x] Triggered from MessageContextModal "Reply" option
   - [x] Show quote preview (text, photo thumbnail, voice indicator) in MessageInput
@@ -370,6 +370,8 @@
   - [ ] Handle multiple users typing in group chats ("Alice and Bob are typing...")
   - [ ] Auto-cleanup typing state after 10 seconds of inactivity
   - [ ] Handle network failures gracefully
+- [x] Add scroll to bottom button
+- [x] Automatically scroll to bottom on message send
 
 #### Group Chat Features
 
