@@ -64,7 +64,8 @@ export interface UpdateMessageData {
 export type DividerType = 'time' | 'newMessages';
 
 export interface DividerMessage {
-  type: 'divider';
-  id: string;
+  isDivider: true;
+  dividerId: string;
+  conversationId: string;
   label: string;
 }

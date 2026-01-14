@@ -3,12 +3,13 @@ import { View, Pressable, StyleSheet, Image } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor } from 'react-native-reanimated';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text, Avatar } from '@/components/ui';
-import { PendingMessage, Profile, type Message, type MessageWithReactions } from '@/types';
+import { PendingMessage, Profile, type MessageWithReactions } from '@/types';
 import { QuotedContent } from './QuotedContent';
 import { FontAwesome6 } from '@expo/vector-icons';
+import { getMessageDeletedAt, getMessageId, getMessageReactions, isPendingMessage } from '@/utils';
 
 interface MessageBubbleProps {
-  message: MessageWithReactions;
+  message: MessageWithReactions | PendingMessage;
   senderProfile: Profile;
   isOwn: boolean;
   isGroup: boolean;
@@ -17,7 +18,6 @@ interface MessageBubbleProps {
   onQuotedPostPress?: (postId: string) => void;
   onQuotedMessagePress?: (messageId: string) => void;
   getUserProfile?: (userId: string) => { fullName: string; profilePhotoUrl: string | null } | null; // For quoted message avatars
-  opacity?: number; // For pending messages (0.5)
   isHighlighted?: boolean; // For flash effect when scrolling to message
 }
 
@@ -30,15 +30,22 @@ export function MessageBubble({
   onLongPress,
   onQuotedPostPress,
   onQuotedMessagePress,
-  opacity = 1,
   isHighlighted = false,
 }: MessageBubbleProps) {
   const { theme } = useTheme();
   const highlightProgress = useSharedValue(0);
+
+  const isPending = isPendingMessage(message);
+  const opacity = isPending ? 0.75 : 1;
+
   const hasQuotedContent = !!message.quotedContent;
   const isHeartOnPost = message.quotedContent?.type === 'post' && message.type === 'heart';
   const isCommentOnPost = message.quotedContent?.type === 'post' && message.type === 'comment';
-  const hasReactions = message.reactions.length > 0;
+
+  const reactions = getMessageReactions(message);
+  const hasReactions = reactions.length > 0;
+
+  const deletedAt = getMessageDeletedAt(message);
 
   // Animate highlight when isHighlighted changes
   useEffect(() => {
@@ -75,7 +82,7 @@ export function MessageBubble({
   });
 
   // Deleted message placeholder
-  if (message.deletedAt) {
+  if (deletedAt) {
     return (
       <View style={[styles.container, isOwn ? styles.ownContainer : styles.otherContainer]}>
         <View
@@ -99,19 +106,24 @@ export function MessageBubble({
     switch (message.type) {
       case 'text':
         return <Text size="sm">{message.content}</Text>;
-      case 'photo':
-        return message.mediaUrl ? (
-          <Image source={{ uri: message.mediaUrl }} style={styles.media} resizeMode="cover" />
-        ) : null;
-      case 'video':
-        return message.mediaUrl ? (
+      case 'photo': {
+        const media = isPending ? message.mediaUri : message.mediaUrl;
+        // TODO: Placeholder, also is mediaUrl / Uri the same?
+        return media ? <Image source={{ uri: media }} style={styles.media} resizeMode="cover" /> : null;
+      }
+      case 'video': {
+        const media = isPending ? message.mediaUri : message.mediaUrl;
+        // TODO: Placeholder, also is mediaUrl / Uri the same?
+        return media ? (
           <View style={[styles.media, { backgroundColor: theme.colors.highlightLow }]}>
             <Text size="sm" color="muted">
               🎥 Video
             </Text>
           </View>
         ) : null;
+      }
       case 'voice':
+        // TODO: Create design system for voice messages
         return (
           <View style={[styles.voiceContainer, { backgroundColor: theme.colors.highlightMed }]}>
             <Text size="sm">🎤 Voice message</Text>
@@ -133,24 +145,17 @@ export function MessageBubble({
     }
   };
 
-  const getReactionIsPending = (reaction: Message | PendingMessage): reaction is PendingMessage => {
-    return 'isPending' in reaction && reaction.isPending;
-  };
-  const getReactionId = (reaction: Message | PendingMessage) => {
-    return getReactionIsPending(reaction) ? reaction.pendingId : reaction.id;
-  };
-
   const renderReactions = () => {
-    if (message.reactions.length === 0) return null;
+    if (!hasReactions) return null;
     const reactionsContainerStyle = isOwn ? styles.ownReactionsContainer : styles.otherReactionsContainer;
     return (
       <View style={[styles.reactionsContainer, reactionsContainerStyle]}>
-        {message.reactions.map((reaction) => (
+        {reactions.map((reaction) => (
           <View
-            key={getReactionId(reaction)}
+            key={getMessageId(reaction)}
             style={[
               styles.reactionBubble,
-              { opacity: getReactionIsPending(reaction) ? 0.3 : 1, backgroundColor: theme.colors.highlightLow },
+              { opacity: isPendingMessage(reaction) ? 0.3 : 1, backgroundColor: theme.colors.highlightLow },
             ]}
           >
             {reaction.reactionType === 'heart' && (

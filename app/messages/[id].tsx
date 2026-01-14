@@ -19,6 +19,7 @@ import {
 } from '@/types';
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { isDifferentDay, formatDateDivider } from '@/utils/formatting';
+import { getMessageId, isDividerMessage } from '@/utils';
 
 export default function ConversationScreen() {
   const { theme } = useTheme();
@@ -161,27 +162,23 @@ export default function ConversationScreen() {
     const reversedWithDividers = stitched.reverse();
 
     // 7. Add pending messages at the beginning (they're newest, so add after reversing)
-    const allMessages: Array<MessageWithReactions | DividerMessage> = [...reversedWithDividers];
+    const allMessages: Array<MessageWithReactions | DividerMessage | PendingMessage> = [...reversedWithDividers];
     for (const pending of pendingMessages) {
       // Skip pending reactions
       if (pending.type === 'reaction') continue;
 
       // Convert pending to message-like object for display
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pendingAsMessage: any = {
+      const pendingAsMessage: PendingMessage = {
         isPending: true,
-        id: pending.pendingId,
+        pendingId: pending.pendingId,
         conversationId: pending.conversationId,
         senderId: pending.senderId,
         type: pending.type,
         content: pending.content,
-        mediaUrl: pending.mediaUri,
+        mediaUri: pending.mediaUri,
         quotedContent: pending.quotedContent,
-        createdAt: { toDate: () => pending.createdAt, toMillis: () => pending.createdAt.getTime() },
-        readBy: [],
-        deletedAt: null,
         status: pending.status,
-        reactions: [],
+        createdAt: pending.createdAt,
       };
       allMessages.unshift(pendingAsMessage);
     }
@@ -207,23 +204,24 @@ export default function ConversationScreen() {
         }
 
         allMessages.unshift({
-          type: 'divider',
-          id: 'divider-typing',
+          isDivider: true,
+          dividerId: 'divider-typing',
+          conversationId: conversationId,
           label: typingLabel,
         });
       }
     }
 
     // 8. Insert dividers (date breaks and "New Messages" divider)
-    const withDividers: Array<MessageWithReactions | DividerMessage> = [];
+    const withDividers: Array<MessageWithReactions | DividerMessage | PendingMessage> = [];
     let newMessagesDividerInserted = false;
 
     for (let i = 0; i < allMessages.length; i++) {
       const currentMessage = allMessages[i];
 
       // Skip dividers that might already be in the list (shouldn't happen, but safety check)
-      if ('type' in currentMessage && currentMessage.type === 'divider') {
-        withDividers.push(currentMessage as DividerMessage);
+      if (isDividerMessage(currentMessage)) {
+        withDividers.push(currentMessage);
         continue;
       }
 
@@ -237,7 +235,7 @@ export default function ConversationScreen() {
         const previousMessage = allMessages[i - 1];
 
         // Skip if previous is a divider
-        if (!('type' in previousMessage && previousMessage.type === 'divider')) {
+        if (!isDividerMessage(previousMessage)) {
           const previousIsUnread =
             previousMessage.senderId !== user.uid &&
             'readBy' in previousMessage &&
@@ -246,8 +244,9 @@ export default function ConversationScreen() {
           // If previous was unread and current is read, insert divider
           if (previousIsUnread && !isCurrentUnread) {
             const newMessagesDivider: DividerMessage = {
-              type: 'divider',
-              id: 'divider-newMessages',
+              isDivider: true,
+              dividerId: 'divider-newMessages',
+              conversationId: conversationId,
               label: 'New Messages',
             };
             withDividers.push(newMessagesDivider);
@@ -264,14 +263,15 @@ export default function ConversationScreen() {
         const nextMessage = allMessages[i + 1];
 
         // Skip if next is a divider
-        if (!('type' in nextMessage && nextMessage.type === 'divider')) {
+        if (!isDividerMessage(nextMessage)) {
           const nextTimestamp = nextMessage.createdAt;
 
           // Insert date divider when days are different
           if (isDifferentDay(currentTimestamp, nextTimestamp)) {
             const dateBreak: DividerMessage = {
-              type: 'divider',
-              id: `divider-time-${nextMessage.id}`,
+              isDivider: true,
+              dividerId: `divider-time-${getMessageId(nextMessage)}`,
+              conversationId: conversationId,
               label: formatDateDivider(nextTimestamp),
             };
             withDividers.push(dateBreak);
@@ -282,8 +282,9 @@ export default function ConversationScreen() {
 
     if (moreMessagesLoading) {
       withDividers.push({
-        type: 'divider',
-        id: 'divider-loadingMore',
+        isDivider: true,
+        dividerId: 'divider-loadingMore',
+        conversationId: conversationId,
         label: 'Loading more messages...',
       });
     }
@@ -358,39 +359,53 @@ export default function ConversationScreen() {
   const handleQuotedMessagePress = useCallback(
     (messageId: string) => {
       // Find the message in the display messages (includes pending)
-      const allMessages = displayMessages;
-      const messageIndex = allMessages.findIndex((msg) => {
-        // Check if it's a Message (has id) or PendingMessage (has pendingId)
-        return 'id' in msg ? msg.id === messageId : false;
-      });
-      if (messageIndex !== -1 && flatListRef.current) {
-        // FlatList is inverted, so we need to scroll to the correct index
-        // In inverted lists, index 0 is at the bottom
-        try {
-          // Set highlighted message before scrolling
-          setHighlightedMessageId(messageId);
-          flatListRef.current.scrollToIndex({ index: messageIndex, animated: true, viewPosition: 0.5 });
-          // Clear highlight after animation completes (2 seconds)
-          setTimeout(() => {
-            setHighlightedMessageId(null);
-          }, 2000);
-        } catch (err) {
-          // If scroll fails (e.g., item not rendered), try scrolling to offset
-          // eslint-disable-next-line no-console
-          console.warn('Failed to scroll to message index:', err);
-          // Still set highlight even if scroll fails
-          setHighlightedMessageId(messageId);
-          setTimeout(() => {
-            setHighlightedMessageId(null);
-          }, 2000);
-        }
-      } else {
+      const messageIndex = displayMessages.findIndex((msg) => getMessageId(msg) === messageId);
+      if (messageIndex === -1) {
         // Message not loaded yet - TODO: Implement fetch with context and scroll
-        Alert.alert('Message', 'Message not loaded. Scroll-to-message with context fetching not yet implemented.');
+        Alert.alert('Message', 'Message not loaded. Scroll-to-message with fetching not yet implemented.');
+        return;
       }
+
+      if (!flatListRef.current) return;
+
+      // Highlight the quoted message
+      setHighlightedMessageId(messageId);
+
+      // FlatList is inverted, so we need to scroll to the correct index
+      // In inverted lists, index 0 is at the bottom
+      try {
+        flatListRef.current.scrollToIndex({ index: messageIndex, animated: true, viewPosition: 0.5 });
+      } catch (err) {
+        // If scroll fails (e.g., item not rendered), try scrolling to offset
+        // eslint-disable-next-line no-console
+        console.warn('Failed to scroll to message index:', err);
+        // TODO: SENTRY
+      }
+
+      // Clear highlight after animation completes (2 seconds)
+      setTimeout(() => {
+        setHighlightedMessageId(null);
+      }, 2000);
     },
     [displayMessages]
   );
+
+  // Log duplicate keys
+  // useEffect(() => {
+  //   const existingKeys = new Set<string>();
+  //   displayMessages.forEach((item) => {
+  //     const id = getMessageId(item);
+  //     if (existingKeys.has(id)) {
+  //       console.log('duplicate key', id, item, {
+  //         isDivider: isDividerMessage(item),
+  //         isPending: isPendingMessage(item),
+  //         isMessage: isMessage(item),
+  //         isMessageWithReactions: isMessageWithReactions(item),
+  //       });
+  //     }
+  //     existingKeys.add(id);
+  //   });
+  // }, [displayMessages]);
 
   if (loading) {
     return (
@@ -430,7 +445,7 @@ export default function ConversationScreen() {
         </View>
       </View>
       <View style={styles.messagesContainer}>
-        <FlatList
+        <FlatList<MessageWithReactions | DividerMessage | PendingMessage>
           ref={flatListRef}
           data={displayMessages}
           onScroll={(event) => {
@@ -443,22 +458,10 @@ export default function ConversationScreen() {
             }
           }}
           scrollEventThrottle={16}
-          keyExtractor={(item) => {
-            // Handle dividers
-            if ('type' in item && item.type === 'divider') {
-              return (item as DividerMessage).id;
-            }
-            // Handle pending messages
-            if ('isPending' in item && item.isPending) {
-              return (item as PendingMessage).pendingId;
-            }
-            // Handle regular messages
-            return (item as MessageWithReactions).id;
-          }}
+          keyExtractor={getMessageId}
           renderItem={({ item }) => {
             // Handle dividers
-            const isDivider = 'type' in item && item.type === 'divider';
-            if (isDivider) {
+            if (isDividerMessage(item)) {
               return (
                 <View style={styles.dividerContainer}>
                   <Text size="sm" color="muted" style={{ fontStyle: 'italic' }}>
@@ -467,11 +470,10 @@ export default function ConversationScreen() {
                 </View>
               );
             }
+
             // Handle regular messages and pending messages
-            const message = item as MessageWithReactions | PendingMessage;
+            const message = item;
             const isOwn = message.senderId === user?.uid;
-            const isPending = 'isPending' in message && message.isPending;
-            const opacity = isPending ? 0.75 : 1;
 
             // Get sender info for group chats
             const senderProfile = conversation?.participantProfiles?.find((p) => p.id === message.senderId) || null;
@@ -482,11 +484,10 @@ export default function ConversationScreen() {
 
             return (
               <MessageBubble
-                message={message as MessageWithReactions}
+                message={message}
                 senderProfile={senderProfile}
                 isOwn={isOwn}
                 isGroup={conversation?.type === 'group'}
-                opacity={opacity}
                 isHighlighted={isHighlighted}
                 onLongPress={() => handleMessageLongPress(message as MessageWithReactions)}
                 onQuotedPostPress={(postId) => router.push(`/post/${postId}`)}
