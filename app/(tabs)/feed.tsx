@@ -15,7 +15,7 @@ import { useFeedPosts } from '@/hooks/useFeedPosts';
 export default function FeedScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { friendIds, getProfileById } = useFriends();
+  const { friendIds, getProfileById, loading: friendsLoading } = useFriends();
   const router = useRouter();
 
   // Calculate feed user IDs (friends + current user)
@@ -28,7 +28,7 @@ export default function FeedScreen() {
   const { posts, loading, refreshing, loadingMore, refresh, loadMore } = useFeedPosts({
     userIds: feedUserIds,
     getProfileById,
-    enabled: !!user,
+    enabled: user != null && !friendsLoading,
   });
 
   // Post options state
