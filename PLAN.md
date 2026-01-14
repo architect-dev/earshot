@@ -261,7 +261,7 @@
   - [x] Message bubbles (sent/received styling)
   - [x] Pending messages (50% opacity until confirmed sent)
   - [x] Read receipts (delivered/read)
-  - [ ] "Beginning of your conversation with {User}" component before first message
+  - [x] "Beginning of your conversation with {User}" component before first message
   - [ ] Timestamp display improvements:
     - [ ] Instagram-style swipe left to reveal timestamp (hide timestamp by default, show on swipe)
     - [ ] Insert time breaks between messages:

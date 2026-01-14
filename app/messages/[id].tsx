@@ -4,7 +4,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-na
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6 } from '@expo/vector-icons';
-import { ScreenContainer, Text, Avatar } from '@/components/ui';
+import { ScreenContainer, Text, Avatar, Spacer } from '@/components/ui';
 import { MessageBubble, MessageInput, MessageContextModal } from '@/components/messages';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -289,8 +289,45 @@ export default function ConversationScreen() {
       });
     }
 
+    // Add "Beginning of conversation" divider when all messages are loaded and it's a DM
+    if (!hasMore && conversation?.type === 'dm' && user) {
+      const otherUserProfile = conversation.participantProfiles.find((p) => p.id !== user.uid);
+      if (otherUserProfile) {
+        const beginningDivider: DividerMessage = {
+          isDivider: true,
+          dividerId: 'divider-conversationStart',
+          conversationId: conversationId,
+          component: (
+            <View style={styles.conversationStartContainer}>
+              <Text size="sm" color="muted" style={styles.conversationStartLabel}>
+                Beginning of your conversation with:
+              </Text>
+              <Spacer size={48} />
+              <Avatar source={otherUserProfile.profilePhotoUrl} name={otherUserProfile.fullName} size="lg" />
+              <Spacer size={24} />
+              <Text size="md" weight="semibold" style={styles.conversationStartName}>
+                {otherUserProfile.fullName}
+              </Text>
+              <Text size="sm" color="muted">
+                @{otherUserProfile.username}
+              </Text>
+              {messages.length === 0 && pendingMessages.length === 0 && (
+                <>
+                  <Spacer size={48} />
+                  <Text size="sm" color="muted">
+                    Say Hi 👋!
+                  </Text>
+                </>
+              )}
+            </View>
+          ),
+        };
+        withDividers.push(beginningDivider);
+      }
+    }
+
     return withDividers;
-  }, [messages, conversationId, pendingMessages, user, moreMessagesLoading, conversation]);
+  }, [messages, conversationId, pendingMessages, user, moreMessagesLoading, conversation, hasMore]);
 
   // Get other user info (for DMs)
   const otherUser = useMemo(() => {
@@ -462,13 +499,19 @@ export default function ConversationScreen() {
           renderItem={({ item }) => {
             // Handle dividers
             if (isDividerMessage(item)) {
-              return (
-                <View style={styles.dividerContainer}>
-                  <Text size="sm" color="muted" style={{ fontStyle: 'italic' }}>
-                    {item.label}
-                  </Text>
-                </View>
-              );
+              if (item.label) {
+                return (
+                  <View style={styles.dividerContainer}>
+                    <Text size="sm" color="muted" style={{ fontStyle: 'italic' }}>
+                      {item.label}
+                    </Text>
+                  </View>
+                );
+              }
+              if (item.component) {
+                return <View style={styles.container}>{item.component}</View>;
+              }
+              return null;
             }
 
             // Handle regular messages and pending messages
@@ -576,6 +619,19 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  conversationStartContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 156,
+  },
+  conversationStartLabel: {
+    textAlign: 'center',
+  },
+  conversationStartName: {
+    marginBottom: 4,
+    textAlign: 'center',
   },
   scrollToBottomButton: {
     position: 'absolute',

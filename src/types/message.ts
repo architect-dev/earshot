@@ -60,12 +60,10 @@ export interface UpdateMessageData {
   deletedAt?: Timestamp | null;
 }
 
-// Divider messages for UI breaks
-export type DividerType = 'time' | 'newMessages';
-
 export interface DividerMessage {
   isDivider: true;
   dividerId: string;
   conversationId: string;
-  label: string;
+  label?: string;
+  component?: React.ReactNode;
 }
