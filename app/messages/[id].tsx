@@ -79,21 +79,20 @@ export default function ConversationScreen() {
 
   // Mark messages as read when conversation loads
   useEffect(() => {
-    if (!conversationId || !user || !conversation || messages.length === 0) return;
+    if (!conversationId || !user || messages.length === 0) return;
 
     const timeout = setTimeout(() => {
       const unreadMessageIds = messages.filter((msg) => !msg.readBy.includes(user.uid)).map((msg) => msg.id);
       if (unreadMessageIds.length > 0) {
-        // Don't await - mark as read in background
         markMessagesAsRead(conversationId, user.uid, unreadMessageIds).catch((err) => {
           // eslint-disable-next-line no-console
           console.error('Error marking messages as read:', err);
         });
       }
-    }, 2000);
+    }, 4000);
 
     return () => clearTimeout(timeout);
-  }, [conversationId, user, conversation, messages]);
+  }, [conversationId, user, messages]);
 
   // Load more messages (infinite scroll)
   const handleLoadMore = useCallback(async () => {
