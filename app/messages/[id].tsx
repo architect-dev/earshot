@@ -20,6 +20,7 @@ import {
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { isDifferentDay, formatDateDivider } from '@/utils/formatting';
 import { getMessageId, isDividerMessage } from '@/utils';
+import { LastSeenText } from '@/components/ui/LastSeenText';
 
 export default function ConversationScreen() {
   const { theme } = useTheme();
@@ -303,7 +304,7 @@ export default function ConversationScreen() {
                 Beginning of your conversation with:
               </Text>
               <Spacer size={48} />
-              <Avatar source={otherUserProfile.profilePhotoUrl} name={otherUserProfile.fullName} size="lg" />
+              <Avatar profile={otherUserProfile} size="lg" />
               <Spacer size={24} />
               <Text size="md" weight="semibold" style={styles.conversationStartName}>
                 {otherUserProfile.fullName}
@@ -377,8 +378,6 @@ export default function ConversationScreen() {
         messageId: message.id,
         senderId: message.senderId,
         preview: {
-          senderName: senderProfile?.fullName || 'Unknown',
-          senderUsername: senderProfile?.username || '',
           text: message.content || undefined,
           mediaUrl: message.mediaUrl || undefined,
         },
@@ -476,9 +475,12 @@ export default function ConversationScreen() {
         </Pressable>
         <View style={styles.headerContent}>
           <Avatar source={headerAvatar} name={headerAvatarName} size="sm" style={styles.headerAvatar} />
-          <Text size="lg" weight="semibold" style={styles.headerTitle}>
-            {headerTitle}
-          </Text>
+          <View style={styles.headerTitleContainer}>
+            <Text size="lg" weight="semibold">
+              {headerTitle}
+            </Text>
+            <LastSeenText lastSeen={otherUser?.lastSeen} size="xs" color="subtle" />
+          </View>
         </View>
       </View>
       <View style={styles.messagesContainer}>
@@ -664,6 +666,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
+  },
+  headerTitleContainer: {
+    flexDirection: 'column',
+    gap: 0,
   },
   headerAvatar: {
     width: 32,

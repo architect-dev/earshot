@@ -12,7 +12,13 @@ function ProfileTabIcon({ focused }: { focused: boolean }) {
 
   return (
     <View style={[styles.avatarContainer, focused && { borderColor: theme.colors.gold, borderWidth: 2 }]}>
-      <Avatar source={userProfile?.profilePhotoUrl} name={userProfile?.fullName} size="sm" style={styles.avatar} />
+      <Avatar
+        source={userProfile?.profilePhotoUrl}
+        name={userProfile?.fullName}
+        size="sm"
+        style={styles.avatar}
+        online
+      />
     </View>
   );
 }

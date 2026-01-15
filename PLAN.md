@@ -486,9 +486,9 @@
 
 - [ ] Implement lastSeen heartbeat (update every 60 seconds when app active)
 - [ ] Add AppState listener to track foreground/background
-- [ ] Update FriendRow to show online indicator (green dot if lastSeen < 2 min)
-- [ ] Show "Last seen X ago" for offline friends
 - [ ] Add usePresence hook for heartbeat management
+- [x] Update FriendRow to show online indicator (green dot if lastSeen < 2 min)
+- [x] Show "Last seen X ago" for offline friends
 
 ### Phase 10: Security Hardening
 

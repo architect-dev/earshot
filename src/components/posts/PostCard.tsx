@@ -37,7 +37,7 @@ export function PostCard({
           style={styles.authorInfo}
           disabled={disableAuthorPress}
         >
-          <Avatar source={post.author.profilePhotoUrl} name={post.author.fullName} size="sm" />
+          <Avatar profile={post.author} size="sm" />
           <View style={styles.authorText}>
             <Text size="sm" weight="semibold">
               {post.author.fullName}

@@ -27,14 +27,6 @@ export function QuotedContent({
 }: QuotedContentProps) {
   const { theme } = useTheme();
 
-  // Get quoted message sender profile
-
-  const displayName =
-    quotedContent.type === 'post'
-      ? quotedContent.preview.authorName
-      : senderProfile.fullName || quotedContent.preview.senderName;
-  const displayAvatar = quotedContent.type === 'post' ? null : senderProfile.profilePhotoUrl || null;
-
   // Different styles based on variant
   const containerStyle =
     variant === 'input'
@@ -70,9 +62,9 @@ export function QuotedContent({
             )}
           </>
         )}
-        <Avatar source={displayAvatar} name={displayName} size="xs" />
+        <Avatar profile={senderProfile} size="xs" />
         <Text size="xs" weight="semibold" color="subtle">
-          {displayName}
+          {senderProfile.fullName}
           {quotedContent.type === 'post' && `'s Post`}
         </Text>
         {onClear && (

@@ -46,11 +46,8 @@ export function ConversationRow({ conversation, currentUserId, onPress }: Conver
   // For groups, show group name
   const otherUserProfile =
     conversation.type === 'dm' ? conversation.participantProfiles.find((p) => p.id !== currentUserId) : null;
-
   const displayName =
     conversation.type === 'dm' ? otherUserProfile?.fullName || 'Unknown' : conversation.groupName || 'Group Chat';
-  const avatarSource = conversation.type === 'dm' ? otherUserProfile?.profilePhotoUrl : null;
-  const avatarName = conversation.type === 'dm' ? otherUserProfile?.fullName : conversation.groupName || 'Group';
 
   const preview = getLastMessagePreview(conversation.latestMessage);
   const timestamp = conversation.lastMessageAt ? formatMessageTimestamp(conversation.lastMessageAt) : '';
@@ -62,7 +59,7 @@ export function ConversationRow({ conversation, currentUserId, onPress }: Conver
       disabled={!onPress}
     >
       <View style={styles.avatarContainer}>
-        <Avatar source={avatarSource} name={avatarName} size="md" />
+        <Avatar profile={otherUserProfile} size="md" />
         {unreadCount > 0 && !isMuted && (
           <View style={[styles.unreadBadge, { backgroundColor: theme.colors.pine }]}>
             <Text size="xs" weight="semibold" color="base">

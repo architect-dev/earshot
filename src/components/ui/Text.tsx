@@ -6,7 +6,7 @@ import { fontSize as fontSizes, fontWeight as fontWeights } from '@/theme';
 export type FontSize = keyof typeof fontSizes;
 export type FontWeight = keyof typeof fontWeights;
 
-interface TextProps extends RNTextProps {
+export interface TextProps extends RNTextProps {
   size?: FontSize;
   weight?: FontWeight;
   color?: 'base' | 'text' | 'subtle' | 'muted' | 'love' | 'pine' | 'gold' | 'iris' | 'foam' | 'rose';

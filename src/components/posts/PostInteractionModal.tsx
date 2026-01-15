@@ -217,10 +217,10 @@ export function PostInteractionModal({ visible, onClose, onSend, post, type, loa
                     },
                   ]}
                 >
-                  <Avatar source={item.displayAvatar} name={item.displayName} size="sm" />
+                  <Avatar profile={item.conversation.type === 'dm' ? post.author : null} size="sm" />
                   <View style={styles.conversationInfo}>
                     <Text size="sm" weight={isSelected ? 'semibold' : undefined}>
-                      {item.displayName}
+                      {item.conversation.type === 'dm' ? post.author.fullName : item.conversation.groupName}
                     </Text>
                     <Text size="xs" color="muted">
                       {item.conversation.type === 'dm' ? 'Direct Message' : 'Group Chat'}

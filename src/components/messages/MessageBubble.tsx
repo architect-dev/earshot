@@ -176,7 +176,7 @@ export function MessageBubble({
       {/* Group chat: show sender avatar and name */}
       {!isOwn && isGroup && senderProfile.fullName && (
         <View style={styles.senderInfo}>
-          <Avatar source={senderProfile.profilePhotoUrl} name={senderProfile.fullName} size="xs" />
+          <Avatar profile={senderProfile} size="xs" />
           {senderProfile.fullName && (
             <Text size="xs" color="muted" style={styles.senderName}>
               {senderProfile.fullName}

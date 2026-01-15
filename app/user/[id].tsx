@@ -113,7 +113,7 @@ export default function UserFeedScreen() {
           <FontAwesome6 name="chevron-left" size={18} color={theme.colors.text} />
         </Pressable>
         <View style={styles.headerContent}>
-          <Avatar source={profile.profilePhotoUrl} name={profile.fullName} size="sm" style={styles.headerAvatar} />
+          <Avatar profile={profile} size="sm" style={styles.headerAvatar} />
           <Text size="lg" weight="semibold" style={styles.headerTitle}>
             {profile.fullName}
           </Text>

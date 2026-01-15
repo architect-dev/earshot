@@ -3,16 +3,11 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Avatar, Text, Button } from '@/components/ui';
-import { type Timestamp } from 'firebase/firestore';
+import { Profile } from '@/types';
+import { LastSeenText } from '../ui/LastSeenText';
 
 interface FriendRowProps {
-  user: {
-    id: string;
-    username: string;
-    fullName: string;
-    profilePhotoUrl: string | null;
-    lastSeen?: Timestamp | null;
-  };
+  user: Profile;
   onPress?: () => void;
   // For friend requests
   showActions?: boolean;
@@ -29,31 +24,6 @@ interface FriendRowProps {
   requestDirection?: 'incoming' | 'outgoing';
 }
 
-// Check if user is online (lastSeen within 2 minutes)
-function isOnline(lastSeen: Timestamp | null | undefined): boolean {
-  if (!lastSeen) return false;
-  const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
-  return lastSeen.toMillis() > twoMinutesAgo;
-}
-
-// Format last seen time
-function formatLastSeen(lastSeen: Timestamp | null | undefined): string {
-  if (!lastSeen) return '';
-
-  const now = Date.now();
-  const lastSeenTime = lastSeen.toMillis();
-  const diffMs = now - lastSeenTime;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMins < 2) return 'Online';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return 'A while ago';
-}
-
 export function FriendRow({
   user,
   onPress,
@@ -67,7 +37,6 @@ export function FriendRow({
   requestDirection,
 }: FriendRowProps) {
   const { theme } = useTheme();
-  const online = isOnline(user.lastSeen);
 
   return (
     <Pressable
@@ -75,21 +44,14 @@ export function FriendRow({
       onPress={onPress}
       disabled={!onPress || loading}
     >
-      <View style={styles.avatarContainer}>
-        <Avatar source={user.profilePhotoUrl} name={user.fullName} size="md" />
-        {user.lastSeen !== undefined && (
-          <View
-            style={[styles.onlineIndicator, { backgroundColor: online ? theme.colors.pine : theme.colors.muted }]}
-          />
-        )}
-      </View>
+      <Avatar profile={user} size="md" />
 
       <View style={styles.info}>
         <Text weight="medium">{user.fullName}</Text>
         <Text size="xs" color="muted">
           @{user.username}
-          {user.lastSeen !== undefined && !online && ` · ${formatLastSeen(user.lastSeen)}`}
         </Text>
+        <LastSeenText lastSeen={user.lastSeen} size="xs" color="muted" />
       </View>
 
       {onOptionsPress && !showActions && (

@@ -84,8 +84,6 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
           : {
               messageId: data.quotedContent.messageId,
               preview: {
-                senderName: data.quotedContent.preview.senderName,
-                senderUsername: data.quotedContent.preview.senderUsername,
                 ...(data.quotedContent.preview.text ? { text: data.quotedContent.preview.text } : {}),
                 ...(data.quotedContent.preview.mediaUrl ? { mediaUrl: data.quotedContent.preview.mediaUrl } : {}),
                 ...(data.quotedContent.preview.voiceUrl ? { voiceUrl: data.quotedContent.preview.voiceUrl } : {}),

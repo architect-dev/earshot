@@ -227,7 +227,7 @@ export default function ProfileScreen() {
 
       {/* Avatar */}
       <Pressable onPress={handlePickPhoto} disabled={isLoading} style={styles.avatarSection}>
-        <Avatar source={userProfile?.profilePhotoUrl} name={userProfile?.fullName} size="xl" />
+        <Avatar profile={userProfile} size="xl" />
         <View style={[styles.editBadge, { backgroundColor: theme.colors.surface }]}>
           <FontAwesome6 name="camera" size={14} color={theme.colors.text} />
         </View>

@@ -23,8 +23,6 @@ export interface QuotedMessage {
     text?: string;
     mediaUrl?: string;
     voiceUrl?: string;
-    senderName: string;
-    senderUsername: string;
   };
 }
 

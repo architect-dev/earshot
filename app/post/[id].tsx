@@ -12,6 +12,7 @@ import { getPostWithAuthor } from '@/services/posts';
 import { findOrCreateDM } from '@/services/conversations';
 import { getErrorMessage } from '@/utils/errors';
 import { type PostWithAuthor } from '@/types';
+import { LastSeenText } from '@/components/ui/LastSeenText';
 
 export default function PostDetailScreen() {
   const { theme } = useTheme();
@@ -107,15 +108,13 @@ export default function PostDetailScreen() {
           <FontAwesome6 name="chevron-left" size={18} color={theme.colors.text} />
         </Pressable>
         <View style={styles.headerContent}>
-          <Avatar
-            source={post.author.profilePhotoUrl}
-            name={post.author.fullName}
-            size="sm"
-            style={styles.headerAvatar}
-          />
-          <Text size="lg" weight="semibold" style={styles.headerTitle}>
-            {post.author.fullName}'s Post
-          </Text>
+          <Avatar profile={post.author} size="sm" style={styles.headerAvatar} />
+          <View style={styles.headerTitleContainer}>
+            <Text size="lg" weight="semibold" style={styles.headerTitle}>
+              {post.author.fullName}'s Post
+            </Text>
+            <LastSeenText lastSeen={post.author.lastSeen} size="xs" color="subtle" />
+          </View>
         </View>
       </View>
 
@@ -153,6 +152,10 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
+  headerTitleContainer: {
+    flexDirection: 'column',
+    gap: 1,
+  },
   backButton: {
     padding: 8,
     marginRight: 8,
@@ -166,9 +169,7 @@ const styles = StyleSheet.create({
   headerAvatar: {
     marginRight: 0,
   },
-  headerTitle: {
-    flex: 1,
-  },
+  headerTitle: {},
   content: {
     flex: 1,
   },

@@ -321,7 +321,7 @@ export default function FriendsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View style={[styles.blockedRow, { borderBottomColor: theme.colors.highlightLow }]}>
-              <Avatar source={item.profilePhotoUrl} name={item.fullName} size="md" />
+              <Avatar profile={item} size="md" />
               <View style={styles.blockedInfo}>
                 <Text weight="medium">{item.fullName}</Text>
                 <Text size="xs" color="muted">
@@ -369,7 +369,7 @@ export default function FriendsScreen() {
 
         {searchResult && (
           <View style={[styles.searchResult, { borderColor: theme.colors.highlightMed }]}>
-            <Avatar source={searchResult.profilePhotoUrl} name={searchResult.fullName} size="md" />
+            <Avatar profile={searchResult} size="md" />
             <View style={styles.searchResultInfo}>
               <Text weight="medium">{searchResult.fullName}</Text>
               <Text size="xs" color="muted">

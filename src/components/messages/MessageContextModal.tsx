@@ -45,12 +45,9 @@ export function MessageContextModal({
     } else {
       const quotedMessage: QuotedMessage = {
         type: 'message',
+        senderId: message.senderId,
         messageId: message.id,
-        preview: {
-          // Preview can be empty as per requirements
-          senderName: '', // Will be populated by UI if needed
-          senderUsername: '',
-        },
+        preview: {},
       };
       sendMessage(message.content || '', quotedMessage, undefined, 'heart');
     }
