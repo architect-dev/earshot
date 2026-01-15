@@ -11,6 +11,8 @@ import {
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text } from './Text';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated from 'react-native-reanimated';
 
 interface ModalProps {
   visible: boolean;
@@ -43,6 +45,7 @@ export function Modal({
   contentStyle,
 }: ModalProps) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const handleBackdropPress = () => {
     if (dismissable) {
@@ -54,39 +57,44 @@ export function Modal({
     <RNModal visible={visible} transparent animationType={animationType} onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Pressable style={[styles.backdrop, { backgroundColor: 'rgba(0, 0, 0, 0.7)' }]} onPress={handleBackdropPress}>
-          <Pressable
+          <Animated.View
             style={[
               styles.container,
               {
                 backgroundColor: theme.colors.surface,
                 borderColor: theme.colors.highlightMed,
+                paddingBottom: insets.bottom,
               },
               containerStyle,
             ]}
-            // Prevent backdrop press from triggering when pressing modal content
-            onPress={(e) => e.stopPropagation()}
           >
-            {(title || showCloseButton) && (
-              <View style={styles.header}>
-                <View style={styles.headerTitle}>
-                  {title && (
-                    <Text size="lg" weight="semibold">
-                      {title}
-                    </Text>
+            <Pressable
+              style={[styles.pressableContainer]}
+              // Prevent backdrop press from triggering when pressing modal content
+              onPress={(e) => e.stopPropagation()}
+            >
+              {(title || showCloseButton) && (
+                <View style={styles.header}>
+                  <View style={styles.headerTitle}>
+                    {title && (
+                      <Text size="lg" weight="semibold">
+                        {title}
+                      </Text>
+                    )}
+                  </View>
+                  {showCloseButton && (
+                    <Pressable onPress={onClose} style={styles.closeButton} hitSlop={8}>
+                      <FontAwesome6 name="xmark" size={18} color={theme.colors.muted} />
+                    </Pressable>
                   )}
                 </View>
-                {showCloseButton && (
-                  <Pressable onPress={onClose} style={styles.closeButton} hitSlop={8}>
-                    <FontAwesome6 name="xmark" size={18} color={theme.colors.muted} />
-                  </Pressable>
-                )}
-              </View>
-            )}
+              )}
 
-            <View style={[styles.content, contentStyle]}>{children}</View>
+              <View style={[styles.content, contentStyle]}>{children}</View>
 
-            {footer && <View style={styles.footer}>{footer}</View>}
-          </Pressable>
+              {footer && <View style={styles.footer}>{footer}</View>}
+            </Pressable>
+          </Animated.View>
         </Pressable>
       </KeyboardAvoidingView>
     </RNModal>
@@ -99,9 +107,9 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    padding: 24,
+    position: 'relative',
   },
   container: {
     width: '100%',
@@ -109,6 +117,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 0, // Sharp corners - no rounded borders
     // No shadow - completely flat design
+  },
+  pressableContainer: {
+    width: '100%',
   },
   header: {
     flexDirection: 'row',

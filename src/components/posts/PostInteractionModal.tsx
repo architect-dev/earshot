@@ -161,6 +161,7 @@ export function PostInteractionModal({ visible, onClose, onSend, post, type, loa
 
   const handleClose = () => {
     setComment('');
+    setConversations([]);
     setSelectedConversationId(null);
     setHeartCount(1);
     onClose();
@@ -175,7 +176,7 @@ export function PostInteractionModal({ visible, onClose, onSend, post, type, loa
   const isHeartMode = type === 'heart';
   const canSend = isHeartMode || comment.trim().length > 0;
   const hasConversations = conversations.length > 0;
-  const showCreateDM = !hasConversations || selectedConversationId === null;
+  const showCreateDM = !loadingConversations && (!hasConversations || selectedConversationId === null);
 
   // Create quoted content for the post
   const quotedContent: QuotedContentType = {

@@ -112,6 +112,7 @@ export async function findOrCreateDM(userId1: string, userId2: string): Promise<
 
 /**
  * Get conversations that include a specific user (for group chat detection)
+ * TODO: This should look at conversations context instead of querying the database
  */
 export async function getConversationsWithUser(currentUserId: string, otherUserId: string): Promise<Conversation[]> {
   // Get all conversations where current user is a participant
