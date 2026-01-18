@@ -3,7 +3,7 @@ import { View, Image, StyleSheet, type ViewStyle } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Text, FontSize } from './Text';
 import { Profile } from '@/types';
-import { useIsOnline } from '@/hooks/useIsOnline';
+import { useIsOnline } from '@/contexts/PresenceContext';
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -43,7 +43,7 @@ const fontSizeMap: Record<AvatarSize, FontSize> = {
 export function Avatar({ profile, source, name, size = 'md', style, online }: AvatarProps) {
   const { theme } = useTheme();
   const dimension = sizeMap[size];
-  const isOnline = useIsOnline(profile?.lastSeen);
+  const isOnline = useIsOnline(profile?.id);
 
   const nameOrOverride = profile?.fullName || name || '';
   const sourceOrOverride = profile?.profilePhotoUrl || source;

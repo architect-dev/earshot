@@ -51,7 +51,7 @@ export function FriendRow({
         <Text size="xs" color="muted">
           @{user.username}
         </Text>
-        <LastSeenText lastSeen={user.lastSeen} size="xs" color="muted" />
+        <LastSeenText userId={user.id} size="xs" color="muted" />
       </View>
 
       {onOptionsPress && !showActions && (

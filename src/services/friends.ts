@@ -317,7 +317,6 @@ export async function getFriends(userId: string): Promise<FriendWithProfile[]> {
           username: friend.username,
           fullName: friend.fullName,
           profilePhotoUrl: friend.profilePhotoUrl,
-          lastSeen: friend.lastSeen,
         },
         friendsSince: friendship.updatedAt || friendship.createdAt,
       });
@@ -354,7 +353,6 @@ export async function getPendingRequests(userId: string): Promise<{
           username: otherUser.username,
           fullName: otherUser.fullName,
           profilePhotoUrl: otherUser.profilePhotoUrl,
-          lastSeen: otherUser.lastSeen,
         },
         createdAt: request.createdAt,
         direction: isIncoming ? 'incoming' : 'outgoing',

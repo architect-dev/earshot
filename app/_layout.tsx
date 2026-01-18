@@ -6,6 +6,7 @@ import { StyleSheet } from 'react-native';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { FriendsProvider } from '@/contexts/FriendsContext';
+import { PresenceProvider } from '@/contexts/PresenceContext';
 import { ConversationsProvider } from '@/contexts/ConversationsContext';
 import { PostInteractionProvider } from '@/contexts/PostInteractionContext';
 import { DebugProvider, useDebug } from '@/contexts/DebugContext';
@@ -116,13 +117,15 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <FriendsProvider>
-            <ConversationsProvider>
-              <PostInteractionProvider>
-                <DebugProvider>
-                  <RootLayoutNav />
-                </DebugProvider>
-              </PostInteractionProvider>
-            </ConversationsProvider>
+            <PresenceProvider>
+              <ConversationsProvider>
+                <PostInteractionProvider>
+                  <DebugProvider>
+                    <RootLayoutNav />
+                  </DebugProvider>
+                </PostInteractionProvider>
+              </ConversationsProvider>
+            </PresenceProvider>
           </FriendsProvider>
         </AuthProvider>
       </ThemeProvider>

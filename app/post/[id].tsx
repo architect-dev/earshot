@@ -113,7 +113,7 @@ export default function PostDetailScreen() {
             <Text size="lg" weight="semibold" style={styles.headerTitle}>
               {post.author.fullName}'s Post
             </Text>
-            <LastSeenText lastSeen={post.author.lastSeen} size="xs" color="subtle" />
+            <LastSeenText userId={post.author.id} size="xs" color="subtle" />
           </View>
         </View>
       </View>

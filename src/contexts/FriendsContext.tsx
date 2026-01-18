@@ -64,7 +64,15 @@ export function FriendsProvider({ children }: FriendsProviderProps) {
   // Get profile by user ID (includes current user)
   const getProfileById = useCallback(
     (userId: string): Profile | undefined => {
-      if (userProfile != null && userId === userProfile.id) return userProfile;
+      if (userProfile != null && userId === userProfile.id) {
+        // Convert User to Profile (exclude lastSeen and other User-only fields)
+        return {
+          id: userProfile.id,
+          username: userProfile.username,
+          fullName: userProfile.fullName,
+          profilePhotoUrl: userProfile.profilePhotoUrl,
+        };
+      }
       return friends.find((f) => f.user.id === userId)?.user;
     },
     [friends, userProfile]

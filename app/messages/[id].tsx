@@ -479,7 +479,7 @@ export default function ConversationScreen() {
             <Text size="lg" weight="semibold">
               {headerTitle}
             </Text>
-            <LastSeenText lastSeen={otherUser?.lastSeen} size="xs" color="subtle" />
+            <LastSeenText userId={otherUser?.id} size="xs" color="subtle" />
           </View>
         </View>
       </View>
