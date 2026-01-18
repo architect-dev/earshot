@@ -11,8 +11,18 @@ export const getLastSeenString = (lastSeen: Timestamp | null | undefined): strin
   const lastSeenTime = Math.round(lastSeen.toMillis() / 1000);
   const diff = now - lastSeenTime;
   if (diff < TWO_MINUTES) return 'Online';
-  if (diff < ONE_HOUR) return `Last seen ${diff} minutes ago`;
-  if (diff < ONE_DAY) return `Last seen ${diff} hours ago`;
-  if (diff < ONE_WEEK) return `Last seen ${diff} days ago`;
-  return `Last seen ${diff} weeks ago`;
+  if (diff < ONE_HOUR) {
+    const minutes = Math.floor(diff / 60);
+    return `Last seen ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+  }
+  if (diff < ONE_DAY) {
+    const hours = Math.floor(diff / ONE_HOUR);
+    return `Last seen ${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  }
+  if (diff < ONE_WEEK) {
+    const days = Math.floor(diff / ONE_DAY);
+    return `Last seen ${days} ${days === 1 ? 'day' : 'days'} ago`;
+  }
+  const weeks = Math.floor(diff / ONE_WEEK);
+  return `Last seen ${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
 };
