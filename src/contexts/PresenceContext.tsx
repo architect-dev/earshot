@@ -3,6 +3,8 @@ import { type Timestamp } from 'firebase/firestore';
 import { subscribeToDocument, COLLECTIONS, getDocument } from '@/services/firebase/firestore';
 import { type User } from '@/types';
 import { getLastSeenString } from '@/utils/lastSeen';
+import { useIsForeground } from '@/hooks/useAppState';
+import { updateLastSeen } from '@/services/users';
 import { useAuth } from './AuthContext';
 import { useFriends } from './FriendsContext';
 
@@ -19,6 +21,48 @@ interface PresenceProviderProps {
   children: ReactNode;
 }
 
+/**
+ * Hook to manage lastSeen heartbeat updates
+ * Updates the current user's lastSeen timestamp every 60 seconds when app is active
+ */
+function useLastSeenHeartbeat() {
+  const { user } = useAuth();
+  const isForeground = useIsForeground();
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!user || !isForeground) {
+      // Clear interval if user logs out or app goes to background
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Start heartbeat when app is active and user is logged in
+    heartbeatIntervalRef.current = setInterval(() => {
+      updateLastSeen(user.uid).catch((err) => {
+        // Silently fail - presence updates are non-critical
+        // eslint-disable-next-line no-console
+        console.error('Error updating lastSeen:', err);
+      });
+    }, 60000); // 60 seconds
+
+    // Update immediately on mount/foreground
+    updateLastSeen(user.uid).catch(() => {
+      // Silently fail
+    });
+
+    return () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+    };
+  }, [user, isForeground]);
+}
+
 export function PresenceProvider({ children }: PresenceProviderProps) {
   const { user } = useAuth();
   const { friendIds, loading: friendsLoading } = useFriends();
@@ -29,6 +73,9 @@ export function PresenceProvider({ children }: PresenceProviderProps) {
   const subscriptionsRef = useRef<Map<string, () => void>>(new Map());
   const updateQueueRef = useRef<Map<string, Timestamp | null>>(new Map());
   const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Manage lastSeen heartbeat for current user
+  useLastSeenHeartbeat();
 
   // Load initial presence data for all friends
   const loadInitialPresence = useCallback(async (friendIdsToLoad: string[]) => {
