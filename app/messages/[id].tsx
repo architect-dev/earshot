@@ -347,20 +347,6 @@ export default function ConversationScreen() {
     return conversation.groupName || 'Group Chat';
   }, [conversation, otherUser]);
 
-  const headerAvatar = useMemo(() => {
-    if (conversation?.type === 'dm' && otherUser) {
-      return otherUser.profilePhotoUrl;
-    }
-    return null;
-  }, [conversation, otherUser]);
-
-  const headerAvatarName = useMemo(() => {
-    if (conversation?.type === 'dm' && otherUser) {
-      return otherUser.fullName;
-    }
-    return conversation?.groupName || 'Group';
-  }, [conversation, otherUser]);
-
   // Handle message context modal
   const handleMessageLongPress = useCallback((message: MessageWithReactions) => {
     setSelectedMessage(message);
@@ -474,7 +460,7 @@ export default function ConversationScreen() {
           <FontAwesome6 name="chevron-left" size={18} color={theme.colors.text} />
         </Pressable>
         <View style={styles.headerContent}>
-          <Avatar source={headerAvatar} name={headerAvatarName} size="sm" style={styles.headerAvatar} />
+          {otherUser && <Avatar profile={otherUser} size="sm" style={styles.headerAvatar} />}
           <View style={styles.headerTitleContainer}>
             <Text size="lg" weight="semibold">
               {headerTitle}
