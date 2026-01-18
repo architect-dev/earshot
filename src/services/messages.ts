@@ -15,7 +15,7 @@ import {
   type DocumentSnapshot,
   deleteField,
 } from './firebase/firestore';
-import { type Message, type CreateMessageData, type ReactionType } from '@/types';
+import { type Message, type CreateMessageData, type ReactionType, Conversation } from '@/types';
 import { updateConversation, getConversation } from './conversations';
 
 const MESSAGES_PAGE_SIZE = 50;
@@ -118,7 +118,7 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
       throw new Error('Conversation not found');
     }
 
-    const conversationData = conversationDoc.data() as { unreadCounts: Record<string, number> };
+    const conversationData = conversationDoc.data() as Conversation;
 
     // STEP 2: WRITES - Now do all writes (message creation and conversation update)
     // Create message document
@@ -141,7 +141,9 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
     // Increment unread counts for all participants except sender
     const updatedUnreadCounts = { ...conversationData.unreadCounts };
     Object.keys(updatedUnreadCounts).forEach((userId) => {
-      if (userId !== data.senderId) {
+      if (userId === data.senderId) {
+        updatedUnreadCounts[userId] = 0;
+      } else {
         updatedUnreadCounts[userId] = (updatedUnreadCounts[userId] || 0) + 1;
       }
     });

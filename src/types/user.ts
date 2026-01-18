@@ -8,7 +8,7 @@ export interface User {
   profilePhotoUrl: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
-  friendCount: number;
+  friendCount: number; // TODO: This shouldn't be visible to everyone
   lastSeen: Timestamp | null;
 }
 

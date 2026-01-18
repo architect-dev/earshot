@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { type DocumentSnapshot, type Timestamp } from 'firebase/firestore';
 import { getUserConversations } from '@/services/conversations';
 import { getConversationMessages } from '@/services/messages';
@@ -87,7 +87,6 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-  const activeConversationIdRef = useRef<string | null>(null);
   const [messages, setMessages] = useState<Map<string, ConversationMessages>>(new Map());
   const [messagesLoading, setMessagesLoading] = useState<Map<string, boolean>>(new Map());
   const [moreMessagesLoading, setMoreMessagesLoading] = useState<Map<string, boolean>>(new Map());
@@ -96,11 +95,6 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
   // Track subscriptions for cleanup
   const conversationsUnsubscribeRef = useRef<(() => void) | null>(null);
   const messagesUnsubscribeRefs = useRef<Map<string, () => void>>(new Map());
-
-  // Keep ref in sync with state
-  useEffect(() => {
-    activeConversationIdRef.current = activeConversationId;
-  }, [activeConversationId]);
 
   // Pre-fetch messages for all conversations
   const preFetchMessages = useCallback(async (conversationIds: string[]) => {
@@ -208,39 +202,12 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
       COLLECTIONS.CONVERSATIONS,
       [where('participants', 'array-contains', user.uid), orderBy('lastMessageAt', 'desc')],
       (updatedConversations) => {
-        setConversations((prev) => {
-          const prevMap = new Map(prev.map((c) => [c.id, c]));
-
-          // Merge conversations, handling unread count updates for new messages
-          const merged = updatedConversations.map((conv) => {
-            const prevConv = prevMap.get(conv.id);
-
-            // Check if latestMessage changed (new message arrived)
-            const latestMessageChanged =
-              prevConv && conv.latestMessage?.id !== prevConv.latestMessage?.id && conv.latestMessage !== null;
-
-            const isFromOtherUser = conv.latestMessage?.senderId !== user.uid;
-            const isConversationActive = activeConversationIdRef.current === conv.id;
-
-            // Update unread counts if new message from other user and conversation not active
-            let updatedUnreadCounts = { ...conv.unreadCounts };
-            if (latestMessageChanged && isFromOtherUser && !isConversationActive) {
-              updatedUnreadCounts[user.uid] = (updatedUnreadCounts[user.uid] || 0) + 1;
-            }
-
-            // Merge with previous conversation data
-            const mergedConv: Conversation = {
-              ...conv,
-              latestMessage: conv.latestMessage || prevConv?.latestMessage || null,
-              unreadCounts: updatedUnreadCounts,
-            };
-
-            // Enrich the conversation with friend data
-            return enrichConversation(mergedConv, getProfileById);
-          });
-
-          return merged;
+        // Enrich conversations with friend data and compute typing states
+        const enriched = updatedConversations.map((conv) => {
+          return enrichConversation(conv, getProfileById);
         });
+
+        setConversations(enriched);
       }
     );
 
@@ -264,157 +231,136 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
     };
   }, [user, getProfileById]);
 
-  // Memoize conversation IDs - only changes when IDs actually change (not when conversation data updates)
-  // Create a stable sorted array that only changes when the actual IDs change
-  const conversationIdsKey = useMemo(() => {
-    return conversations
-      .map((c) => c.id)
-      .sort()
-      .join(',');
-  }, [conversations]);
-
-  const conversationIds = useMemo(() => {
-    const ids = conversations.map((c) => c.id);
-    return [...ids].sort(); // Sort for stable comparison
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationIdsKey]); // Only re-compute when the key (IDs) changes, not when conversation data changes
-
-  // Subscribe to real-time message updates for all conversations
+  // Subscribe to real-time message updates for active conversation only
   useEffect(() => {
-    if (!user || conversationIds.length === 0) {
+    // Capture ref at start of effect for cleanup
+    const currentRef = messagesUnsubscribeRefs.current;
+
+    if (!user || !activeConversationId) {
+      // Cleanup all message subscriptions when no active conversation
+      currentRef.forEach((unsubscribe) => unsubscribe());
+      currentRef.clear();
       return;
     }
 
-    // Capture ref at start of effect
-    const currentRef = messagesUnsubscribeRefs.current;
+    // Only subscribe if we don't already have a subscription for this conversation
+    if (currentRef.has(activeConversationId)) {
+      return;
+    }
 
-    const isInitialSnapshot = new Map<string, boolean>();
-    const subscriptionsCreated = new Map<string, () => void>();
+    const conversationId = activeConversationId; // Capture for cleanup
+    const isInitialSnapshot = { current: true };
 
-    conversationIds.forEach((conversationId) => {
-      // Only subscribe if we don't already have a subscription
-      if (!currentRef.has(conversationId)) {
-        isInitialSnapshot.set(conversationId, true);
+    try {
+      const unsubscribe = subscribeToQuery<Message>(
+        COLLECTIONS.MESSAGES,
+        [
+          where('conversationId', '==', conversationId),
+          orderBy('createdAt', 'desc'),
+          limit(50), // Get the 50 most recent messages for real-time updates
+        ],
+        (subscriptionMessages) => {
+          if (isInitialSnapshot.current) {
+            // First snapshot - ignore, we already have messages from pre-fetch
+            isInitialSnapshot.current = false;
+            return;
+          }
 
-        try {
-          const unsubscribe = subscribeToQuery<Message>(
-            COLLECTIONS.MESSAGES,
-            [
-              where('conversationId', '==', conversationId),
-              orderBy('createdAt', 'desc'),
-              limit(50), // Get the 50 most recent messages for real-time updates
-            ],
-            (subscriptionMessages) => {
-              const isInitial = isInitialSnapshot.get(conversationId);
-              if (isInitial) {
-                // First snapshot - ignore, we already have messages from pre-fetch
-                isInitialSnapshot.set(conversationId, false);
-                return;
-              }
+          if (subscriptionMessages.length === 0) {
+            return;
+          }
 
-              if (subscriptionMessages.length === 0) {
-                return;
-              }
-
-              // Remove pending messages for any messages that have a pendingId
-              subscriptionMessages.forEach((msg) => {
-                if (msg.pendingId) {
-                  removePendingMessage(conversationId, msg.pendingId);
+          // Remove pending messages for any messages that have a pendingId
+          subscriptionMessages.forEach((msg) => {
+            if (msg.pendingId) {
+              setPendingMessages((prevPending) => {
+                const newPendingMap = new Map(prevPending);
+                const conversationPending = newPendingMap.get(conversationId) || [];
+                const filtered = conversationPending.filter((p) => p.pendingId !== msg.pendingId);
+                if (filtered.length === 0) {
+                  newPendingMap.delete(conversationId);
+                } else {
+                  newPendingMap.set(conversationId, filtered);
                 }
-              });
-
-              // Merge subscription messages with cached messages
-              setMessages((prev) => {
-                const existing = prev.get(conversationId);
-                if (!existing) {
-                  return prev; // Messages not initialized yet
-                }
-
-                // Create a map of subscription messages by ID for fast lookup
-                const subscriptionMessagesMap = new Map<string, Message>();
-                subscriptionMessages.forEach((msg) => {
-                  subscriptionMessagesMap.set(msg.id, msg);
-                });
-
-                // Merge logic:
-                // 1. Update existing messages if they're in the subscription (handles deletions/updates)
-                // 2. Keep older messages that aren't in the subscription
-                // 3. Add new messages from subscription that aren't in cache
-                const mergedMessages: Message[] = [];
-                const subscriptionMessageIds = new Set(subscriptionMessagesMap.keys());
-
-                // console.log('existing messages', existing.messages);
-
-                // Process cached messages
-                existing.messages.forEach((cachedMsg) => {
-                  if (subscriptionMessageIds.has(cachedMsg.id)) {
-                    // Message is in subscription - use the subscription version (handles updates/deletions)
-                    mergedMessages.push(subscriptionMessagesMap.get(cachedMsg.id)!);
-                  } else {
-                    // Message is not in subscription (older than top 50) - keep cached version
-                    mergedMessages.push(cachedMsg);
-                  }
-                });
-
-                // console.log('mergedMessages', mergedMessages);
-
-                // Add any new messages from subscription that aren't in cache
-                subscriptionMessages.forEach((subMsg) => {
-                  const existsInCache = existing.messages.some((msg) => msg.id === subMsg.id);
-                  if (!existsInCache) {
-                    // New message - add it (will be sorted by createdAt below)
-                    mergedMessages.push(subMsg);
-                  }
-                });
-
-                // console.log('mergedMessages after new messages', mergedMessages);
-
-                // Sort by createdAt desc (most recent first)
-                mergedMessages.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-
-                // Update lastFetchedAt to the most recent message's timestamp
-                const mostRecentTimestamp =
-                  mergedMessages.length > 0 ? mergedMessages[0].createdAt : existing.lastFetchedAt;
-
-                const newMap = new Map(prev);
-                newMap.set(conversationId, {
-                  ...existing,
-                  messages: mergedMessages,
-                  lastFetchedAt: mostRecentTimestamp,
-                });
-
-                return newMap;
+                return newPendingMap;
               });
             }
-          );
+          });
 
-          currentRef.set(conversationId, unsubscribe);
-          subscriptionsCreated.set(conversationId, unsubscribe);
-        } catch (err) {
-          // eslint-disable-next-line no-console
-          console.error('[Messages Subscription] Error creating subscription for:', conversationId, err);
+          // Merge subscription messages with cached messages
+          setMessages((prev) => {
+            const existing = prev.get(conversationId);
+            if (!existing) {
+              return prev; // Messages not initialized yet
+            }
+
+            // Create a map of subscription messages by ID for fast lookup
+            const subscriptionMessagesMap = new Map<string, Message>();
+            subscriptionMessages.forEach((msg) => {
+              subscriptionMessagesMap.set(msg.id, msg);
+            });
+
+            // Merge logic:
+            // 1. Update existing messages if they're in the subscription (handles deletions/updates)
+            // 2. Keep older messages that aren't in the subscription
+            // 3. Add new messages from subscription that aren't in cache
+            const mergedMessages: Message[] = [];
+            const subscriptionMessageIds = new Set(subscriptionMessagesMap.keys());
+
+            // Process cached messages
+            existing.messages.forEach((cachedMsg) => {
+              if (subscriptionMessageIds.has(cachedMsg.id)) {
+                // Message is in subscription - use the subscription version (handles updates/deletions)
+                mergedMessages.push(subscriptionMessagesMap.get(cachedMsg.id)!);
+              } else {
+                // Message is not in subscription (older than top 50) - keep cached version
+                mergedMessages.push(cachedMsg);
+              }
+            });
+
+            // Add any new messages from subscription that aren't in cache
+            subscriptionMessages.forEach((subMsg) => {
+              const existsInCache = existing.messages.some((msg) => msg.id === subMsg.id);
+              if (!existsInCache) {
+                // New message - add it (will be sorted by createdAt below)
+                mergedMessages.push(subMsg);
+              }
+            });
+
+            // Sort by createdAt desc (most recent first)
+            mergedMessages.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+
+            // Update lastFetchedAt to the most recent message's timestamp
+            const mostRecentTimestamp =
+              mergedMessages.length > 0 ? mergedMessages[0].createdAt : existing.lastFetchedAt;
+
+            const newMap = new Map(prev);
+            newMap.set(conversationId, {
+              ...existing,
+              messages: mergedMessages,
+              lastFetchedAt: mostRecentTimestamp,
+            });
+
+            return newMap;
+          });
         }
-      }
-    });
+      );
 
-    // Cleanup: unsubscribe from conversations that no longer exist
-    currentRef.forEach((unsubscribe, conversationId) => {
-      if (!conversationIds.includes(conversationId)) {
-        unsubscribe();
-        currentRef.delete(conversationId);
-      }
-    });
+      messagesUnsubscribeRefs.current.set(conversationId, unsubscribe);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[Messages Subscription] Error creating subscription for:', conversationId, err);
+    }
 
     return () => {
-      // Cleanup subscriptions created in this effect
-      subscriptionsCreated.forEach((unsubscribe, conversationId) => {
+      // Cleanup subscription when active conversation changes
+      const unsubscribe = currentRef.get(conversationId);
+      if (unsubscribe) {
         unsubscribe();
-        // Remove from ref as well (using captured ref)
         currentRef.delete(conversationId);
-      });
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, conversationIds]);
+  }, [user, activeConversationId]);
 
   // Get conversation by ID
   const getConversationById = useCallback(
