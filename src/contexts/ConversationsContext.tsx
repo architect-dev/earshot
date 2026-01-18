@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { type DocumentSnapshot, type Timestamp } from 'firebase/firestore';
 import { getUserConversations } from '@/services/conversations';
-import { getConversationMessages } from '@/services/messages';
+import { getConversationMessages, markMessagesAsRead } from '@/services/messages';
 import { subscribeToQuery, COLLECTIONS, where, orderBy, limit } from '@/services/firebase/firestore';
 import { type PendingMessage, type Conversation, type Message } from '@/types';
 import { GetProfileByIdFn, type Profile } from '@/types/profile';
@@ -87,6 +87,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const activeConversationIdRef = useRef<string | null>(null);
   const [messages, setMessages] = useState<Map<string, ConversationMessages>>(new Map());
   const [messagesLoading, setMessagesLoading] = useState<Map<string, boolean>>(new Map());
   const [moreMessagesLoading, setMoreMessagesLoading] = useState<Map<string, boolean>>(new Map());
@@ -95,6 +96,11 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
   // Track subscriptions for cleanup
   const conversationsUnsubscribeRef = useRef<(() => void) | null>(null);
   const messagesUnsubscribeRefs = useRef<Map<string, () => void>>(new Map());
+
+  // Keep ref in sync with state for use in subscription callbacks
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   // Pre-fetch messages for all conversations
   const preFetchMessages = useCallback(async (conversationIds: string[]) => {
@@ -270,8 +276,37 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
             return;
           }
 
+          // Mark new messages as read immediately if conversation is active
+          // Find new unread messages from other users
+          const newUnreadMessages = subscriptionMessages.filter(
+            (msg) =>
+              msg.senderId !== user.uid && // Not from current user
+              !msg.readBy.includes(user.uid) && // Not already read
+              !msg.deletedAt // Not deleted
+          );
+
+          // Optimistically update messages to mark them as read in local state
+          const optimisticallyUpdatedMessages = subscriptionMessages.map((msg) => {
+            // If this is a new unread message from another user, optimistically mark as read
+            const readBy = new Set([...msg.readBy, user.uid]);
+            return {
+              ...msg,
+              readBy: Array.from(readBy),
+            };
+          });
+
+          // Mark as read in DB (fire and forget - don't block UI)
+          if (newUnreadMessages.length > 0) {
+            const messageIds = newUnreadMessages.map((msg) => msg.id);
+            markMessagesAsRead(conversationId, user.uid, messageIds).catch((err) => {
+              // Silently fail - read receipts are not critical
+              // eslint-disable-next-line no-console
+              console.error('Error marking messages as read:', err);
+            });
+          }
+
           // Remove pending messages for any messages that have a pendingId
-          subscriptionMessages.forEach((msg) => {
+          optimisticallyUpdatedMessages.forEach((msg) => {
             if (msg.pendingId) {
               setPendingMessages((prevPending) => {
                 const newPendingMap = new Map(prevPending);
@@ -295,8 +330,9 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
             }
 
             // Create a map of subscription messages by ID for fast lookup
+            // Use optimistically updated messages
             const subscriptionMessagesMap = new Map<string, Message>();
-            subscriptionMessages.forEach((msg) => {
+            optimisticallyUpdatedMessages.forEach((msg) => {
               subscriptionMessagesMap.set(msg.id, msg);
             });
 
@@ -319,7 +355,8 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
             });
 
             // Add any new messages from subscription that aren't in cache
-            subscriptionMessages.forEach((subMsg) => {
+            // Use optimistically updated messages (with readBy already updated)
+            optimisticallyUpdatedMessages.forEach((subMsg) => {
               const existsInCache = existing.messages.some((msg) => msg.id === subMsg.id);
               if (!existsInCache) {
                 // New message - add it (will be sorted by createdAt below)
