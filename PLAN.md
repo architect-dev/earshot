@@ -196,6 +196,142 @@
   - [x] UploadProgress component
   - [x] usePhotoPicker hook
 
+### Phase 4.5: Fan-Out Feed System (Feed Optimization)
+
+**Estimated Effort:** 3-4 sessions
+
+**Goal:** Migrate the main feed (FeedScreen) from pull-based feed (limited to 30 friends) to fan-out on write pattern for scalable, real-time feed with unlimited friends. Note: User-specific feeds (UserFeedScreen) will continue using direct post queries and are NOT affected by this change.
+
+#### Cloud Functions Setup
+
+- [ ] Initialize Firebase Functions project
+- [ ] Configure TypeScript for Functions
+- [ ] Set up Firebase Admin SDK
+- [ ] Configure function deployment settings (concurrency, memory, timeout)
+
+#### Fan-Out Function (Post Creation)
+
+- [ ] Create `onPostCreate` Cloud Function:
+  - [ ] Trigger: `onCreate(posts/{postId})`
+  - [ ] Fetch author's friends list efficiently
+  - [ ] Use BulkWriter for parallel fan-out writes (not single batch)
+  - [ ] Write to `feeds/{friendUid}/items/{postId}` for each friend
+  - [ ] Include idempotent writes (docId = postId)
+  - [ ] Add guards: skip if no friends, handle errors gracefully
+  - [ ] Copy full post data into feed item (all Post fields)
+  - [ ] Add `postId` field explicitly (same as document ID, for easy reference)
+  - [ ] Add `expireAt` field for TTL (required: createdAt + 30 days)
+  - [ ] Handle concurrency and hot spot prevention
+
+#### Backfill Function (Friend Addition)
+
+- [ ] Create `onFriendAdd` Cloud Function:
+  - [ ] Trigger: `onCreate(friendships/{friendshipId})` where status='accepted'
+  - [ ] Backfill last K posts (e.g., 50) from new friend
+  - [ ] Use idempotent writes to avoid duplicates
+  - [ ] Handle bidirectional friendship (backfill for both users)
+
+#### Firestore Schema Updates
+
+- [ ] Add `feeds/{viewerUid}/items/{postId}` collection structure
+- [ ] Define FeedItem type as superset of Post:
+  - [ ] All Post fields (id, authorId, textBody, media, mediaAspectRatio, createdAt, updatedAt)
+  - [ ] postId (explicit field, same as document ID - for easy reference in quotedContent, etc.)
+  - [ ] expireAt (required Timestamp for TTL - 30 days from createdAt)
+  - [ ] Note: FeedItem contains full post data, no need to fetch post separately
+- [ ] Enable TTL policy in Firestore:
+  - [ ] Go to Google Cloud Console → Firestore → Time-to-live
+  - [ ] Create TTL policy for collection group `items` (under `feeds/{uid}/items`)
+  - [ ] Set TTL field to `expireAt`
+  - [ ] Note: TTL deletions happen within ~24 hours of expiration
+- [ ] Create composite index: `feeds/{uid}/items` with `orderBy(createdAt desc)`
+
+#### Security Rules Updates
+
+- [ ] Add rules for `feeds/{viewerUid}/items/{postId}`:
+  - [ ] Allow read only for owner (`request.auth.uid == viewerUid`)
+  - [ ] Deny all client writes (server-only)
+- [ ] Update posts rules if needed (should remain same)
+
+#### Client-Side Implementation
+
+- [ ] Create FeedContext (similar to ConversationsContext):
+  - [ ] Support only "main" feed type (NOT user-specific feeds)
+  - [ ] Cache feed data for main feed only
+  - [ ] Real-time subscription for feed head (limit 30-50)
+  - [ ] Pagination for tail using cursor-based `getDocs`
+  - [ ] Track scroll position
+  - [ ] Track `lastSeenAt` timestamp for "N new posts" feature
+  - [ ] Store `unseenNewPosts` array
+- [ ] Update feed service functions:
+  - [ ] `getFeedHead()` - Real-time subscription for main feed
+  - [ ] `getFeedTail(cursor)` - Paginated fetch for main feed
+  - [ ] Note: Subscription callback handles "N new posts" detection (compare new posts to `lastSeenAt`)
+- [ ] Update FeedScreen to use FeedContext:
+  - [ ] Replace `useFeedPosts` hook with `useFeed()` (main feed only)
+  - [ ] Implement real-time head subscription
+  - [ ] Implement paginated tail loading
+  - [ ] Track scroll position
+  - [ ] Show "N new posts" banner when scrolled down
+  - [ ] Handle banner click (scroll to top, merge unseen posts)
+- [ ] Keep UserFeedScreen unchanged:
+  - [ ] Continue using existing `useFeedPosts` hook
+  - [ ] Continue using direct posts query (`where('authorId', '==', userId)`)
+  - [ ] Do NOT use FeedContext for user-specific feeds
+  - [ ] Note: User feeds don't need fan-out since they query posts directly
+- [ ] Update PostDetailScreen:
+  - [ ] Keep using direct post fetch (no feed needed)
+- [ ] Remove old main feed query logic only:
+  - [ ] Remove `getFeedPosts` with `where('authorId', 'in', ...)` from FeedScreen
+  - [ ] Keep `useFeedPosts` hook for UserFeedScreen (still needed)
+  - [ ] Clean up batched query logic from FeedScreen only
+
+#### Migration Strategy
+
+- [ ] Enable TTL policy in Firestore:
+  - [ ] Go to Google Cloud Console → Firestore → Time-to-live
+  - [ ] Create TTL policy for collection group `items` (under `feeds/{uid}/items`)
+  - [ ] Set TTL field to `expireAt`
+  - [ ] Wait for policy to become active (may take several minutes)
+- [ ] Deploy Cloud Functions:
+  - [ ] Deploy `onPostCreate` function (fan-out for new posts)
+  - [ ] Deploy `onFriendshipWrite` function (backfill for new friendships)
+  - [ ] Verify functions are active and working
+- [ ] Switch FeedScreen to new feed system:
+  - [ ] Update FeedScreen to use FeedContext (new feed system)
+  - [ ] Test that new posts appear in feed correctly
+  - [ ] Note: Existing posts won't be in feeds (they're mock data, not needed)
+  - [ ] Note: User-specific feeds remain unchanged (continue using direct post queries)
+- [ ] Cleanup:
+  - [ ] Remove old main feed query code from FeedScreen after migration complete
+  - [ ] Keep `useFeedPosts` hook for UserFeedScreen (still needed)
+  - [ ] No backfill needed - only new posts matter
+
+#### Testing & Validation
+
+- [ ] Test fan-out on post creation:
+  - [ ] Verify feed items appear in all friends' feeds
+  - [ ] Verify full post data is copied correctly
+  - [ ] Verify expireAt is set correctly (createdAt + 30 days)
+  - [ ] Test with user having 150 friends
+  - [ ] Test error handling (no friends, function failure)
+- [ ] Test backfill on friend add:
+  - [ ] Verify last 50 posts appear in new friend's feed
+  - [ ] Test bidirectional backfill
+  - [ ] Verify idempotency (no duplicates)
+- [ ] Test client feed loading (main feed only):
+  - [ ] Real-time head subscription works for FeedScreen
+  - [ ] Pagination works correctly for FeedScreen
+  - [ ] "N new posts" banner appears/disappears correctly
+  - [ ] Scroll position tracking works
+  - [ ] Verify UserFeedScreen still works with existing `useFeedPosts` hook
+- [ ] Test edge cases:
+  - [ ] User with 0 friends (main feed should be empty)
+  - [ ] User with 150 friends (main feed should work correctly)
+  - [ ] Post deletion (should remove from feeds via expireAt TTL - future enhancement)
+  - [ ] Friend removal (should remove from feeds - future enhancement)
+  - [ ] User-specific feed still works independently (not affected by feed system)
+
 ### Phase 5: Messages & Conversations
 
 **Estimated Effort:** 5-6 sessions
@@ -440,7 +576,7 @@
 #### Pull + Cache (No Subscriptions)
 
 - [x] Friends list: Keep as pull + cache (changes infrequently)
-- [ ] Feed posts: Keep as pull + cache (large dataset, paginated)
+- [ ] Feed posts: Migrate to fan-out on write pattern (see Phase 4.5 below)
 
 #### Implementation Details
 
@@ -484,9 +620,9 @@
 
 **Estimated Effort:** 1 session
 
-- [ ] Implement lastSeen heartbeat (update every 60 seconds when app active)
-- [ ] Add AppState listener to track foreground/background
-- [ ] Add usePresence hook for heartbeat management
+- [x] Implement lastSeen heartbeat (update every 60 seconds when app active)
+- [x] Add AppState listener to track foreground/background
+- [x] Add usePresence hook for heartbeat management
 - [x] Update FriendRow to show online indicator (green dot if lastSeen < 2 min)
 - [x] Show "Last seen X ago" for offline friends
 
