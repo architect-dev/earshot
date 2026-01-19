@@ -112,15 +112,18 @@ export default function FeedScreen() {
     setSelectedPost(null);
   };
 
-  const renderPost = ({ item }: { item: PostWithAuthor }) => (
-    <PostCard
-      post={item}
-      onAuthorPress={() => handleAuthorPress(item)}
-      onMediaPress={(index) => handleMediaPress(item, index)}
-      onOptionsPress={() => handleOptionsPress(item)}
-      isOwner={item.authorId === user?.uid}
-    />
-  );
+  const renderPost = ({ item }: { item: PostWithAuthor }) => {
+    if (item.deleted) return null;
+    return (
+      <PostCard
+        post={item}
+        onAuthorPress={() => handleAuthorPress(item)}
+        onMediaPress={(index) => handleMediaPress(item, index)}
+        onOptionsPress={() => handleOptionsPress(item)}
+        isOwner={item.authorId === user?.uid}
+      />
+    );
+  };
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>

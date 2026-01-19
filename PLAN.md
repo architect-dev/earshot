@@ -190,7 +190,7 @@
   - [x] Add/remove/reorder photos
   - [x] Edit crop settings for existing photos
   - [x] Upload progress indicator
-- [x] Implement post deletion
+- [x] Implement post deletion (soft delete: clears content, sets deleted=true and deletedAt timestamp)
 - [x] Reusable components extracted:
   - [x] PhotoEditor system (PhotoStrip, PhotoCropEditor)
   - [x] UploadProgress component
@@ -218,8 +218,7 @@
   - [x] Write to `feeds/{friendUid}/items/{postId}` for each friend
   - [x] Include idempotent writes (docId = postId)
   - [x] Add guards: skip if no friends, handle errors gracefully
-  - [x] Copy full post data into feed item (all Post fields)
-  - [x] Add `postId` field explicitly (same as document ID, for easy reference)
+  - [x] Copy minimal post reference data into feed item (postId, authorId, createdAt, expireAt)
   - [x] Add `expireAt` field for TTL (required: createdAt + 30 days)
   - [x] Handle concurrency and hot spot prevention
 
@@ -234,11 +233,12 @@
 #### Firestore Schema Updates
 
 - [x] Add `feeds/{viewerUid}/items/{postId}` collection structure (created automatically by Cloud Functions)
-- [x] Define FeedItem type as superset of Post:
-  - [x] All Post fields (id, authorId, textBody, media, mediaAspectRatio, createdAt, updatedAt)
-  - [x] postId (explicit field, same as document ID - for easy reference in quotedContent, etc.)
+- [x] Define FeedItem type (minimal fields for post editing support):
+  - [x] postId (document ID - reference to post document)
+  - [x] authorId (for filtering/enrichment)
+  - [x] createdAt (for ordering)
   - [x] expireAt (required Timestamp for TTL - 30 days from createdAt)
-  - [x] Note: FeedItem contains full post data, no need to fetch post separately
+  - [x] Note: FeedItem contains minimal reference data, posts are fetched separately to support editing
 - [x] Enable TTL policy in Firestore:
   - [x] Go to Google Cloud Console → Firestore → Time-to-live
   - [x] Create TTL policy for collection group `items` (under `feeds/{uid}/items`)
@@ -264,19 +264,20 @@
   - [x] Store `newPosts` array (buffered new posts from subscription)
   - [x] Track `unseenPostsCount` (computed from `newPosts.length`)
   - [x] Implement `viewNewPosts()` method to merge `newPosts` into `posts`
-  - [x] Enrich FeedItems with author profiles from FriendsContext
+  - [x] Extract postIds from feed items and batch fetch posts
+  - [x] Enrich posts with author profiles from FriendsContext
+  - [x] Handle edge cases: deleted posts (filter null results), missing posts, batch query errors
   - [x] Duplicate checking (ensure new posts don't exist in `posts` or `newPosts`)
 - [x] Extended `subscribeToQuery` to support subcollections:
   - [x] Accepts `string | string[]` for collection path
   - [x] Supports top-level collections (string) and subcollections (array)
   - [x] Updated FeedContext to use `subscribeToQuery` with subcollection path
-- [ ] Update FeedScreen to use FeedContext:
-  - [ ] Replace `useFeedPosts` hook with `useFeed()` (main feed only)
-  - [ ] Use `posts` from context (real-time head subscription already handled)
+- [x] Update FeedScreen to use FeedContext:
+  - [x] Replace `useFeedPosts` hook with `useFeed()` (main feed only)
+  - [x] Use `posts` from context (real-time head subscription already handled)
   - [ ] Use `loadMore()` for paginated tail loading
-  - [ ] Track scroll position
-  - [ ] Show "N new posts" banner when `unseenPostsCount > 0` and user is scrolled down
-  - [ ] Handle banner click: call `viewNewPosts()` and scroll to top
+  - [x] Show "N new posts" banner when `unseenPostsCount > 0`
+  - [x] Handle banner click: call `viewNewPosts()` and scroll to top
 - [ ] Keep UserFeedScreen unchanged:
   - [ ] Continue using existing `useFeedPosts` hook
   - [ ] Continue using direct posts query (`where('authorId', '==', userId)`)
@@ -286,6 +287,9 @@
   - [ ] Remove `getFeedPosts` with `where('authorId', 'in', ...)` from FeedScreen
   - [ ] Keep `useFeedPosts` hook for UserFeedScreen (still needed)
   - [ ] Clean up batched query logic from FeedScreen only
+- [x] Handle `deleted` posts
+  - [x] If post is deleted when it is opened add "This post has been deleted" message instead of post content
+  - [x] Hide deleted post from feed if it has been deleted.
 
 #### Migration Strategy
 
@@ -298,22 +302,23 @@
   - [x] Deploy `onPostCreate` function (fan-out for new posts)
   - [x] Deploy `onFriendshipWrite` function (backfill for new friendships)
   - [x] Verify functions are active and working (tested: post creation successfully fans out to friends' feeds)
-- [ ] Switch FeedScreen to new feed system:
-  - [ ] Update FeedScreen to use FeedContext (new feed system)
-  - [ ] Test that new posts appear in feed correctly
-  - [ ] Note: Existing posts won't be in feeds (they're mock data, not needed)
-  - [ ] Note: User-specific feeds remain unchanged (continue using direct post queries)
-- [ ] Cleanup:
-  - [ ] Remove old main feed query code from FeedScreen after migration complete
-  - [ ] Keep `useFeedPosts` hook for UserFeedScreen (still needed)
+- [x] Switch FeedScreen to new feed system:
+  - [x] Update FeedScreen to use FeedContext (new feed system)
+  - [x] Test that new posts appear in feed correctly
+  - [x] Note: Existing posts won't be in feeds (they're mock data, not needed)
+  - [x] Note: User-specific feeds remain unchanged (continue using direct post queries)
+- [x] Cleanup:
+  - [x] Remove old main feed query code from FeedScreen after migration complete
+  - [x] Keep `useFeedPosts` hook for UserFeedScreen (still needed)
   - [x] No backfill needed - only new posts matter
 
 #### Testing & Validation
 
 - [x] Test fan-out on post creation:
   - [x] Verify feed items appear in all friends' feeds
-  - [x] Verify full post data is copied correctly
+  - [x] Verify minimal feed item data is written correctly (postId, authorId, createdAt, expireAt)
   - [x] Verify expireAt is set correctly (createdAt + 30 days)
+  - [x] Verify posts are fetched correctly from feed items
   - [ ] Test with user having 150 friends
   - [ ] Test error handling (no friends, function failure)
 - [ ] Test backfill on friend add:

@@ -28,6 +28,16 @@ export function PostCard({
   const { theme } = useTheme();
   const { handleHeartPress, handleCommentPress } = usePostInteraction();
 
+  if (post.deleted) {
+    return (
+      <View style={[styles.container, { borderBottomColor: theme.colors.highlightLow }]}>
+        <Text size="sm" color="muted" style={{ fontStyle: 'italic', padding: 16 }}>
+          Deleted post
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { borderBottomColor: theme.colors.highlightLow }]}>
       {/* Header */}
