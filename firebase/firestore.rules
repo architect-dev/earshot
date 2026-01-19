@@ -13,6 +13,11 @@ service cloud.firestore {
     function isEmailVerified() {
       return isAuthenticated() && (request.auth.token.email_verified == true);
     }
+
+    function isConversationParticipant(conversationId) {
+      return request.auth.uid in
+        get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+    }
     
     // Check if two users are friends
     function areFriends(userId1, userId2) {
@@ -91,53 +96,50 @@ service cloud.firestore {
     // Conversations collection
     match /conversations/{conversationId} {
       // Only participants can read/write
-      allow read: if isAuthenticated() && 
-                    isEmailVerified() && 
+      allow read: if isAuthenticated() &&
+                    isEmailVerified() &&
                     request.auth.uid in resource.data.participants;
-      
-      allow create: if isAuthenticated() && 
-                      isEmailVerified() && 
+
+      allow create: if isAuthenticated() &&
+                      isEmailVerified() &&
                       request.auth.uid in request.resource.data.participants;
-      
-      allow update: if isAuthenticated() && 
-                      isEmailVerified() && 
+
+      allow update: if isAuthenticated() &&
+                      isEmailVerified() &&
                       request.auth.uid in resource.data.participants;
-      
+
       // Messages subcollection
       match /messages/{messageId} {
-        allow read: if isAuthenticated() && 
-                      isEmailVerified() && 
-                      request.auth.uid in resource.parent.data.participants;
-        
-        allow create: if isAuthenticated() && 
-                        isEmailVerified() && 
-                        request.auth.uid in resource.parent.data.participants &&
+
+        // Only participants can read messages
+        allow read: if isAuthenticated() &&
+                      isEmailVerified() &&
+                      isConversationParticipant(conversationId);
+
+        allow create: if isAuthenticated() && isEmailVerified() &&
+                        isConversationParticipant(conversationId) &&
                         request.auth.uid == request.resource.data.senderId;
-        
-        // Participants can update readBy array (for read receipts)
-        // Only sender can update other fields (like deletedAt, content)
-        allow update: if isAuthenticated() && 
-                        isEmailVerified() && 
-                        request.auth.uid in resource.parent.data.participants &&
+
+        // Sender can update anything; non-senders can ONLY update readBy (and must add themselves)
+        allow update: if isAuthenticated() &&
+                        isEmailVerified() &&
+                        isConversationParticipant(conversationId) &&
                         (
-                          // Allow if sender is updating their own message (e.g., deletion)
-                          // Sender can update any field
+                          // Sender can update any fields (delete/edit/etc.)
                           request.auth.uid == resource.data.senderId ||
-                          // OR allow participants (non-senders) to update ONLY readBy field
-                          // Validate that all other fields remain unchanged
-                          (request.auth.uid != resource.data.senderId &&
-                           request.resource.data.senderId == resource.data.senderId &&
-                           request.resource.data.type == resource.data.type &&
-                           request.resource.data.content == resource.data.content &&
-                           request.resource.data.mediaUrl == resource.data.mediaUrl &&
-                           request.resource.data.voiceUrl == resource.data.voiceUrl &&
-                           request.resource.data.quotedContent == resource.data.quotedContent &&
-                           request.resource.data.reactionType == resource.data.reactionType &&
-                           request.resource.data.heartCount == resource.data.heartCount &&
-                           request.resource.data.createdAt == resource.data.createdAt &&
-                           request.resource.data.deletedAt == resource.data.deletedAt &&
-                           request.resource.data.readBy != null &&
-                           request.resource.data.readBy.hasAll(resource.data.readBy))
+
+                          // Non-senders: only readBy can change, and it can only grow, adding caller
+                          (
+                            request.auth.uid != resource.data.senderId &&
+                            request.resource.data.diff(resource.data).changedKeys().hasOnly(['readBy']) &&
+                            request.resource.data.readBy is list &&
+                            (
+                              // allow missing readBy on existing docs, treat as empty
+                              resource.data.readBy == null ||
+                              request.resource.data.readBy.hasAll(resource.data.readBy)
+                            ) &&
+                            request.resource.data.readBy.hasAny([request.auth.uid])
+                          )
                         );
       }
     }
