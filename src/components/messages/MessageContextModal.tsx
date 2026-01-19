@@ -41,7 +41,7 @@ export function MessageContextModal({
     if (!message || loading) return;
 
     if (heartReaction != null) {
-      deleteMessage((heartReaction as Message).id, currentUserId);
+      deleteMessage(conversationId, (heartReaction as Message).id, currentUserId);
     } else {
       const quotedMessage: QuotedMessage = {
         type: 'message',
@@ -71,7 +71,7 @@ export function MessageContextModal({
         onPress: async () => {
           setLoading(true);
           try {
-            await deleteMessage(message.id, currentUserId);
+            await deleteMessage(conversationId, message.id, currentUserId);
             onDelete();
             onClose();
           } catch (err) {

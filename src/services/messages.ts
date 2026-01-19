@@ -1,7 +1,6 @@
 import {
   COLLECTIONS,
   getDocument,
-  updateDocument,
   queryDocumentsPaginated,
   queryDocuments,
   where,
@@ -15,7 +14,14 @@ import {
   type DocumentSnapshot,
   deleteField,
 } from './firebase/firestore';
-import { type Message, type CreateMessageData, type ReactionType, Conversation } from '@/types';
+import { updateDoc } from 'firebase/firestore';
+import {
+  type Message,
+  type CreateMessageData,
+  type ReactionType,
+  Conversation,
+  MessageWithoutConversationId,
+} from '@/types';
 import { updateConversation, getConversation } from './conversations';
 
 const MESSAGES_PAGE_SIZE = 50;
@@ -93,7 +99,6 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
     : null;
 
   const messageData = {
-    conversationId: data.conversationId,
     senderId: data.senderId,
     type: data.type,
     content: data.content || null,
@@ -121,8 +126,8 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
     const conversationData = conversationDoc.data() as Conversation;
 
     // STEP 2: WRITES - Now do all writes (message creation and conversation update)
-    // Create message document
-    const messageRef = getDocRef(COLLECTIONS.MESSAGES);
+    // Create message document in subcollection
+    const messageRef = getDocRef([COLLECTIONS.CONVERSATIONS, data.conversationId, 'messages']);
     transaction.set(messageRef, {
       ...messageData,
       updatedAt: serverTimestamp(),
@@ -159,7 +164,7 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
   });
 
   // Get the created message to return
-  const createdMessage = await getMessage(messageId);
+  const createdMessage = await getMessage(data.conversationId, messageId);
   if (!createdMessage) {
     throw new Error('Failed to retrieve created message');
   }
@@ -181,9 +186,16 @@ export async function createMessage(data: CreateMessageData): Promise<Message> {
 
 /**
  * Get a message by ID
+ * Note: conversationId is added to the returned message for convenience, even though it's not stored in Firestore
  */
-export async function getMessage(messageId: string): Promise<Message | null> {
-  return getDocument<Message>(COLLECTIONS.MESSAGES, messageId);
+export async function getMessage(conversationId: string, messageId: string): Promise<Message | null> {
+  const message = await getDocument<MessageWithoutConversationId>(
+    [COLLECTIONS.CONVERSATIONS, conversationId, 'messages'],
+    messageId
+  );
+  if (!message) return null;
+  // Add conversationId for convenience (it's implicit in the path)
+  return { ...message, conversationId };
 }
 
 /**
@@ -197,15 +209,18 @@ export async function getConversationMessages(
   lastDoc: DocumentSnapshot | null;
   hasMore: boolean;
 }> {
-  const result = await queryDocumentsPaginated<Message>(
-    COLLECTIONS.MESSAGES,
-    [where('conversationId', '==', conversationId), orderBy('createdAt', 'desc')],
+  const result = await queryDocumentsPaginated<MessageWithoutConversationId>(
+    [COLLECTIONS.CONVERSATIONS, conversationId, 'messages'],
+    [orderBy('createdAt', 'desc')],
     MESSAGES_PAGE_SIZE,
     cursor
   );
 
+  // Add conversationId to each message (it's implicit in the path)
+  const messages: Message[] = result.data.map((msg) => ({ ...msg, conversationId }));
+
   return {
-    messages: result.data,
+    messages,
     lastDoc: result.lastDoc,
     hasMore: result.hasMore,
   };
@@ -215,14 +230,14 @@ export async function getConversationMessages(
  * Get the last message in a conversation (for preview)
  */
 export async function getLastMessage(conversationId: string): Promise<Message | null> {
-  const result = await queryDocumentsPaginated<Message>(
-    COLLECTIONS.MESSAGES,
-    [where('conversationId', '==', conversationId), orderBy('createdAt', 'desc')],
+  const result = await queryDocumentsPaginated<MessageWithoutConversationId>(
+    [COLLECTIONS.CONVERSATIONS, conversationId, 'messages'],
+    [orderBy('createdAt', 'desc')],
     1, // Only need the most recent message
     null
   );
 
-  return result.data.length > 0 ? result.data[0] : null;
+  return result.data.length > 0 ? { ...result.data[0], conversationId } : null;
 }
 
 /**
@@ -234,7 +249,7 @@ export async function markMessagesAsRead(conversationId: string, userId: string,
 
   // Update each message's readBy array using arrayUnion
   for (const messageId of messageIds) {
-    const messageRef = getDocRef(COLLECTIONS.MESSAGES, messageId);
+    const messageRef = getDocRef([COLLECTIONS.CONVERSATIONS, conversationId, 'messages'], messageId);
     batch.update(messageRef, {
       readBy: arrayUnion(userId),
     });
@@ -254,14 +269,7 @@ export async function markMessagesAsRead(conversationId: string, userId: string,
  * Get a quoted message (for validation and preview)
  */
 export async function getQuotedMessage(conversationId: string, messageId: string): Promise<Message | null> {
-  const message = await getMessage(messageId);
-
-  // Validate that the quoted message is from the same conversation
-  if (message && message.conversationId !== conversationId) {
-    throw new Error('Quoted message must be from the same conversation');
-  }
-
-  return message;
+  return getMessage(conversationId, messageId);
 }
 
 /**
@@ -269,8 +277,8 @@ export async function getQuotedMessage(conversationId: string, messageId: string
  * Only the sender can delete their own messages
  * Message remains in conversation to show "Deleted message" placeholder
  */
-export async function deleteMessage(messageId: string, userId: string): Promise<void> {
-  const message = await getMessage(messageId);
+export async function deleteMessage(conversationId: string, messageId: string, userId: string): Promise<void> {
+  const message = await getMessage(conversationId, messageId);
   if (!message) {
     throw new Error('Message not found');
   }
@@ -286,32 +294,42 @@ export async function deleteMessage(messageId: string, userId: string): Promise<
   }
 
   // Mark as deleted and strip all content
-  await updateDocument(COLLECTIONS.MESSAGES, messageId, {
+  const messageRef = getDocRef([COLLECTIONS.CONVERSATIONS, conversationId, 'messages'], messageId);
+  await updateDoc(messageRef, {
     deletedAt: serverTimestamp(),
     content: null,
     mediaUrl: null,
     voiceUrl: null,
     quotedContent: null, // Also remove quoted content
+    updatedAt: serverTimestamp(),
   });
 }
 
 /**
  * Get all reaction messages for a target message
  */
-export async function getMessageReactions(targetMessageId: string): Promise<Message[]> {
-  // Get all reaction messages that quote this target message
-  const allReactions = await queryDocuments<Message>(COLLECTIONS.MESSAGES, [where('type', '==', 'reaction')]);
-
-  return allReactions.filter(
-    (msg) => msg.quotedContent?.type === 'message' && msg.quotedContent.messageId === targetMessageId
+export async function getMessageReactions(conversationId: string, targetMessageId: string): Promise<Message[]> {
+  // Get all reaction messages in this conversation that quote this target message
+  const allReactions = await queryDocuments<MessageWithoutConversationId>(
+    [COLLECTIONS.CONVERSATIONS, conversationId, 'messages'],
+    [where('type', '==', 'reaction')]
   );
+
+  // Add conversationId and filter
+  return allReactions
+    .map((msg) => ({ ...msg, conversationId }))
+    .filter((msg) => msg.quotedContent?.type === 'message' && msg.quotedContent.messageId === targetMessageId);
 }
 
 /**
  * Get reaction count for a specific reaction type on a message
  */
-export async function getReactionCount(targetMessageId: string, reactionType: ReactionType): Promise<number> {
-  const reactions = await getMessageReactions(targetMessageId);
+export async function getReactionCount(
+  conversationId: string,
+  targetMessageId: string,
+  reactionType: ReactionType
+): Promise<number> {
+  const reactions = await getMessageReactions(conversationId, targetMessageId);
   return reactions.filter((r) => r.reactionType === reactionType).length;
 }
 
@@ -325,12 +343,10 @@ export async function hasUserReacted(
   userId: string,
   reactionType: ReactionType
 ): Promise<string | null> {
-  const reactions = await queryDocuments<Message>(COLLECTIONS.MESSAGES, [
-    where('conversationId', '==', conversationId),
-    where('type', '==', 'reaction'),
-    where('senderId', '==', userId),
-    where('reactionType', '==', reactionType),
-  ]);
+  const reactions = await queryDocuments<MessageWithoutConversationId>(
+    [COLLECTIONS.CONVERSATIONS, conversationId, 'messages'],
+    [where('type', '==', 'reaction'), where('senderId', '==', userId), where('reactionType', '==', reactionType)]
+  );
 
   const existingReaction = reactions.find(
     (msg) =>

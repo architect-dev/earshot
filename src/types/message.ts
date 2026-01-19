@@ -22,6 +22,8 @@ export interface Message {
   deletedAt?: Timestamp | null; // Timestamp when message was deleted (null if not deleted)
 }
 
+export type MessageWithoutConversationId = Omit<Message, 'conversationId'>;
+
 export interface PendingMessage {
   isPending: true;
   pendingId: string; // Format: pending-${userId}-${timestampMs}

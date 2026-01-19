@@ -80,6 +80,8 @@ export async function getUserConversations(userId: string): Promise<Conversation
     orderBy('lastMessageAt', 'desc'),
   ]);
 
+  console.log('conversations', conversations);
+
   return conversations;
 }
 

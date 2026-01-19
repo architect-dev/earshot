@@ -38,9 +38,12 @@ export const COLLECTIONS = {
 
 /**
  * Get a single document by ID
+ * Supports both top-level collections and subcollections
+ * @param collectionPath - Collection name (string) or subcollection path (array of strings)
+ * @param docId - Document ID
  */
-export async function getDocument<T>(collectionName: string, docId: string): Promise<T | null> {
-  const docRef = doc(db, collectionName, docId);
+export async function getDocument<T>(collectionPath: string | string[], docId: string): Promise<T | null> {
+  const docRef = getDocRef(collectionPath, docId);
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
@@ -85,9 +88,18 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
 
 /**
  * Query documents with constraints
+ * Supports both top-level collections and subcollections
+ * @param collectionPath - Collection name (string) or subcollection path (array of strings)
+ * @param constraints - Query constraints (where, orderBy, limit, etc.)
  */
-export async function queryDocuments<T>(collectionName: string, constraints: QueryConstraint[]): Promise<T[]> {
-  const collectionRef = collection(db, collectionName);
+export async function queryDocuments<T>(
+  collectionPath: string | string[],
+  constraints: QueryConstraint[]
+): Promise<T[]> {
+  const collectionRef =
+    typeof collectionPath === 'string'
+      ? collection(db, collectionPath)
+      : collection(db, collectionPath[0], ...collectionPath.slice(1));
   const q = query(collectionRef, ...constraints);
   const querySnapshot = await getDocs(q);
 
@@ -108,14 +120,22 @@ export interface PaginatedResult<T> {
 
 /**
  * Query documents with pagination support
+ * Supports both top-level collections and subcollections
+ * @param collectionPath - Collection name (string) or subcollection path (array of strings)
+ * @param constraints - Query constraints (where, orderBy, limit, etc.)
+ * @param pageSize - Number of documents per page
+ * @param cursor - Optional cursor for pagination
  */
 export async function queryDocumentsPaginated<T>(
-  collectionName: string,
+  collectionPath: string | string[],
   constraints: QueryConstraint[],
   pageSize: number,
   cursor?: DocumentSnapshot | null
 ): Promise<PaginatedResult<T>> {
-  const collectionRef = collection(db, collectionName);
+  const collectionRef =
+    typeof collectionPath === 'string'
+      ? collection(db, collectionPath)
+      : collection(db, collectionPath[0], ...collectionPath.slice(1));
 
   // Build constraints with cursor if provided
   const allConstraints = cursor
@@ -198,12 +218,25 @@ export function subscribeToQuery<T>(
 
 /**
  * Get document reference for creating new documents
+ * Supports both top-level collections and subcollections
+ * @param collectionPath - Collection name (string) or subcollection path (array of strings)
+ * @param docId - Optional document ID
  */
-export function getDocRef(collectionName: string, docId?: string): DocumentReference {
-  if (docId) {
-    return doc(db, collectionName, docId);
+export function getDocRef(collectionPath: string | string[], docId?: string): DocumentReference {
+  if (typeof collectionPath === 'string') {
+    // Top-level collection
+    if (docId) {
+      return doc(db, collectionPath, docId);
+    }
+    return doc(collection(db, collectionPath));
+  } else {
+    // Subcollection path: ['parentCollection', 'parentId', 'subcollection', ...]
+    const collectionRef = collection(db, collectionPath[0], ...collectionPath.slice(1));
+    if (docId) {
+      return doc(collectionRef, docId);
+    }
+    return doc(collectionRef);
   }
-  return doc(collection(db, collectionName));
 }
 
 /**

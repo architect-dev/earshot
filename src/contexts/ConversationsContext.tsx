@@ -3,7 +3,7 @@ import { type DocumentSnapshot, type Timestamp } from 'firebase/firestore';
 import { getUserConversations } from '@/services/conversations';
 import { getConversationMessages, markMessagesAsRead } from '@/services/messages';
 import { subscribeToQuery, COLLECTIONS, where, orderBy, limit } from '@/services/firebase/firestore';
-import { type PendingMessage, type Conversation, type Message } from '@/types';
+import { type PendingMessage, type Conversation, type Message, MessageWithoutConversationId } from '@/types';
 import { GetProfileByIdFn, type Profile } from '@/types/profile';
 import { useAuth } from './AuthContext';
 import { useFriends } from './FriendsContext';
@@ -258,10 +258,9 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
     const isInitialSnapshot = { current: true };
 
     try {
-      const unsubscribe = subscribeToQuery<Message>(
-        COLLECTIONS.MESSAGES,
+      const unsubscribe = subscribeToQuery<MessageWithoutConversationId>(
+        [COLLECTIONS.CONVERSATIONS, conversationId, 'messages'],
         [
-          where('conversationId', '==', conversationId),
           orderBy('createdAt', 'desc'),
           limit(50), // Get the 50 most recent messages for real-time updates
         ],
@@ -276,9 +275,15 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
             return;
           }
 
+          // Add conversationId to messages (it's implicit in the subcollection path)
+          const messagesWithConversationId: Message[] = subscriptionMessages.map((msg) => ({
+            ...msg,
+            conversationId,
+          }));
+
           // Mark new messages as read immediately if conversation is active
           // Find new unread messages from other users
-          const newUnreadMessages = subscriptionMessages.filter(
+          const newUnreadMessages = messagesWithConversationId.filter(
             (msg) =>
               msg.senderId !== user.uid && // Not from current user
               !msg.readBy.includes(user.uid) && // Not already read
@@ -286,7 +291,7 @@ export function ConversationsProvider({ children }: ConversationsProviderProps) 
           );
 
           // Optimistically update messages to mark them as read in local state
-          const optimisticallyUpdatedMessages = subscriptionMessages.map((msg) => {
+          const optimisticallyUpdatedMessages = messagesWithConversationId.map((msg) => {
             // If this is a new unread message from another user, optimistically mark as read
             const readBy = new Set([...msg.readBy, user.uid]);
             return {
