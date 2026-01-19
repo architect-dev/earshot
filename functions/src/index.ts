@@ -75,7 +75,7 @@ async function getFriendIds(userId: string): Promise<string[]> {
 }
 
 /**
- * Fan-out post to all friends' feeds
+ * Fan-out post to all friends' feeds (including author's own feed)
  */
 async function fanOutPostToFeeds(post: Post): Promise<void> {
   const postId = post.id;
@@ -83,12 +83,6 @@ async function fanOutPostToFeeds(post: Post): Promise<void> {
 
   // Get all friends
   const friendIds = await getFriendIds(authorId);
-
-  // Skip if no friends
-  if (friendIds.length === 0) {
-    functions.logger.info(`Post ${postId}: Author ${authorId} has no friends, skipping fan-out`);
-    return;
-  }
 
   // Create feed item
   const feedItem = createFeedItem(post);
@@ -98,6 +92,18 @@ async function fanOutPostToFeeds(post: Post): Promise<void> {
 
   let successCount = 0;
   let errorCount = 0;
+
+  // Write to author's own feed
+  const authorFeedItemRef = db.collection(COLLECTIONS.FEEDS).doc(authorId).collection('items').doc(postId);
+  bulkWriter
+    .set(authorFeedItemRef, feedItem, { merge: false })
+    .then(() => {
+      successCount++;
+    })
+    .catch((error) => {
+      errorCount++;
+      functions.logger.error(`Error writing feed item for author ${authorId}:`, error);
+    });
 
   // Write to each friend's feed
   for (const friendId of friendIds) {
@@ -117,8 +123,9 @@ async function fanOutPostToFeeds(post: Post): Promise<void> {
   // Wait for all writes to complete
   await bulkWriter.close();
 
+  const totalRecipients = friendIds.length + 1; // friends + author
   functions.logger.info(
-    `Post ${postId}: Fanned out to ${friendIds.length} friends (${successCount} success, ${errorCount} errors)`
+    `Post ${postId}: Fanned out to ${totalRecipients} feeds (${friendIds.length} friends + author) (${successCount} success, ${errorCount} errors)`
   );
 }
 
