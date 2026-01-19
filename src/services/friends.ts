@@ -24,13 +24,46 @@ function getBlockId(blockerId: string, blockedId: string): string {
 }
 
 /**
+ * Get all friendships for a user (where user is either requester or addressee)
+ * Returns all three arrays for flexibility
+ */
+async function getAllUserFriendships(
+  userId: string,
+  status?: 'pending' | 'accepted' | 'declined'
+): Promise<{
+  allFriendships: Friendship[];
+  requesterFriendships: Friendship[];
+  addresseeFriendships: Friendship[];
+}> {
+  const constraints = status ? [where('status', '==', status)] : [];
+
+  const [requesterFriendships, addresseeFriendships] = await Promise.all([
+    queryDocuments<Friendship>(COLLECTIONS.FRIENDSHIPS, [where('requesterId', '==', userId), ...constraints]),
+    queryDocuments<Friendship>(COLLECTIONS.FRIENDSHIPS, [where('addresseeId', '==', userId), ...constraints]),
+  ]);
+
+  // Combine and deduplicate (shouldn't be duplicates, but just in case)
+  const allFriendshipsMap = new Map<string, Friendship>();
+  [...requesterFriendships, ...addresseeFriendships].forEach((f) => {
+    allFriendshipsMap.set(f.id, f);
+  });
+  const allFriendships = Array.from(allFriendshipsMap.values());
+
+  return {
+    allFriendships,
+    requesterFriendships,
+    addresseeFriendships,
+  };
+}
+
+/**
  * Check if two users are friends
  */
 export async function areFriends(uid1: string, uid2: string): Promise<boolean> {
-  const friendships = await queryDocuments<Friendship>(COLLECTIONS.FRIENDSHIPS, [where('status', '==', 'accepted')]);
+  const { requesterFriendships, addresseeFriendships } = await getAllUserFriendships(uid1, 'accepted');
 
-  return friendships.some(
-    (f) => (f.requesterId === uid1 && f.addresseeId === uid2) || (f.requesterId === uid2 && f.addresseeId === uid1)
+  return (
+    requesterFriendships.some((f) => f.addresseeId === uid2) || addresseeFriendships.some((f) => f.requesterId === uid2)
   );
 }
 
@@ -257,31 +290,19 @@ export async function blockUser(blockerId: string, blockedId: string): Promise<v
   });
 
   // Remove friendship if exists
-  const friendships = await queryDocuments<Friendship>(COLLECTIONS.FRIENDSHIPS, [where('status', '==', 'accepted')]);
+  const { requesterFriendships, addresseeFriendships } = await getAllUserFriendships(blockerId);
 
-  const existingFriendship = friendships.find(
-    (f) =>
-      (f.requesterId === blockerId && f.addresseeId === blockedId) ||
-      (f.requesterId === blockedId && f.addresseeId === blockerId)
-  );
+  const existingFriendship =
+    requesterFriendships.find((f) => f.addresseeId === blockedId) ||
+    addresseeFriendships.find((f) => f.requesterId === blockedId);
 
   if (existingFriendship) {
-    await removeFriend(existingFriendship.id, blockerId);
-  }
-
-  // Also remove any pending requests
-  const pendingFriendships = await queryDocuments<Friendship>(COLLECTIONS.FRIENDSHIPS, [
-    where('status', '==', 'pending'),
-  ]);
-
-  const pendingRequest = pendingFriendships.find(
-    (f) =>
-      (f.requesterId === blockerId && f.addresseeId === blockedId) ||
-      (f.requesterId === blockedId && f.addresseeId === blockerId)
-  );
-
-  if (pendingRequest) {
-    await deleteDocument(COLLECTIONS.FRIENDSHIPS, pendingRequest.id);
+    if (existingFriendship.status === 'accepted') {
+      await removeFriend(existingFriendship.id, blockerId);
+    }
+    if (existingFriendship.status === 'pending') {
+      await deleteDocument(COLLECTIONS.FRIENDSHIPS, existingFriendship.id);
+    }
   }
 }
 
@@ -297,10 +318,7 @@ export async function unblockUser(blockerId: string, blockedId: string): Promise
  * Get list of friends for a user
  */
 export async function getFriends(userId: string): Promise<FriendWithProfile[]> {
-  // Get all accepted friendships where user is involved
-  const friendships = await queryDocuments<Friendship>(COLLECTIONS.FRIENDSHIPS, [where('status', '==', 'accepted')]);
-
-  const userFriendships = friendships.filter((f) => f.requesterId === userId || f.addresseeId === userId);
+  const { allFriendships: userFriendships } = await getAllUserFriendships(userId, 'accepted');
 
   // Get friend profiles
   const friendsWithProfiles: FriendWithProfile[] = [];
@@ -333,9 +351,7 @@ export async function getPendingRequests(userId: string): Promise<{
   incoming: FriendRequest[];
   outgoing: FriendRequest[];
 }> {
-  const friendships = await queryDocuments<Friendship>(COLLECTIONS.FRIENDSHIPS, [where('status', '==', 'pending')]);
-
-  const userRequests = friendships.filter((f) => f.requesterId === userId || f.addresseeId === userId);
+  const { allFriendships: userRequests } = await getAllUserFriendships(userId, 'pending');
 
   const incoming: FriendRequest[] = [];
   const outgoing: FriendRequest[] = [];
