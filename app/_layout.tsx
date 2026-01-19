@@ -7,6 +7,7 @@ import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { FriendsProvider } from '@/contexts/FriendsContext';
 import { PresenceProvider } from '@/contexts/PresenceContext';
+import { FeedProvider } from '@/contexts/FeedContext';
 import { ConversationsProvider } from '@/contexts/ConversationsContext';
 import { PostInteractionProvider } from '@/contexts/PostInteractionContext';
 import { DebugProvider, useDebug } from '@/contexts/DebugContext';
@@ -118,13 +119,15 @@ export default function RootLayout() {
         <AuthProvider>
           <FriendsProvider>
             <PresenceProvider>
-              <ConversationsProvider>
-                <PostInteractionProvider>
-                  <DebugProvider>
-                    <RootLayoutNav />
-                  </DebugProvider>
-                </PostInteractionProvider>
-              </ConversationsProvider>
+              <FeedProvider>
+                <ConversationsProvider>
+                  <PostInteractionProvider>
+                    <DebugProvider>
+                      <RootLayoutNav />
+                    </DebugProvider>
+                  </PostInteractionProvider>
+                </ConversationsProvider>
+              </FeedProvider>
             </PresenceProvider>
           </FriendsProvider>
         </AuthProvider>

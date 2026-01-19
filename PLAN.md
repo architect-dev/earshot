@@ -204,53 +204,53 @@
 
 #### Cloud Functions Setup
 
-- [ ] Initialize Firebase Functions project
-- [ ] Configure TypeScript for Functions
-- [ ] Set up Firebase Admin SDK
-- [ ] Configure function deployment settings (concurrency, memory, timeout)
+- [x] Initialize Firebase Functions project
+- [x] Configure TypeScript for Functions
+- [x] Set up Firebase Admin SDK
+- [x] Configure function deployment settings (concurrency, memory, timeout)
 
 #### Fan-Out Function (Post Creation)
 
-- [ ] Create `onPostCreate` Cloud Function:
-  - [ ] Trigger: `onCreate(posts/{postId})`
-  - [ ] Fetch author's friends list efficiently
-  - [ ] Use BulkWriter for parallel fan-out writes (not single batch)
-  - [ ] Write to `feeds/{friendUid}/items/{postId}` for each friend
-  - [ ] Include idempotent writes (docId = postId)
-  - [ ] Add guards: skip if no friends, handle errors gracefully
-  - [ ] Copy full post data into feed item (all Post fields)
-  - [ ] Add `postId` field explicitly (same as document ID, for easy reference)
-  - [ ] Add `expireAt` field for TTL (required: createdAt + 30 days)
-  - [ ] Handle concurrency and hot spot prevention
+- [x] Create `onPostCreate` Cloud Function:
+  - [x] Trigger: `onCreate(posts/{postId})`
+  - [x] Fetch author's friends list efficiently
+  - [x] Use BulkWriter for parallel fan-out writes (not single batch)
+  - [x] Write to `feeds/{friendUid}/items/{postId}` for each friend
+  - [x] Include idempotent writes (docId = postId)
+  - [x] Add guards: skip if no friends, handle errors gracefully
+  - [x] Copy full post data into feed item (all Post fields)
+  - [x] Add `postId` field explicitly (same as document ID, for easy reference)
+  - [x] Add `expireAt` field for TTL (required: createdAt + 30 days)
+  - [x] Handle concurrency and hot spot prevention
 
 #### Backfill Function (Friend Addition)
 
-- [ ] Create `onFriendAdd` Cloud Function:
-  - [ ] Trigger: `onCreate(friendships/{friendshipId})` where status='accepted'
-  - [ ] Backfill last K posts (e.g., 50) from new friend
-  - [ ] Use idempotent writes to avoid duplicates
-  - [ ] Handle bidirectional friendship (backfill for both users)
+- [x] Create `onFriendshipWrite` Cloud Function:
+  - [x] Trigger: `onWrite(friendships/{friendshipId})` where status='accepted'
+  - [x] Backfill last K posts (e.g., 50) from new friend
+  - [x] Use idempotent writes to avoid duplicates
+  - [x] Handle bidirectional friendship (backfill for both users)
 
 #### Firestore Schema Updates
 
-- [ ] Add `feeds/{viewerUid}/items/{postId}` collection structure
-- [ ] Define FeedItem type as superset of Post:
-  - [ ] All Post fields (id, authorId, textBody, media, mediaAspectRatio, createdAt, updatedAt)
-  - [ ] postId (explicit field, same as document ID - for easy reference in quotedContent, etc.)
-  - [ ] expireAt (required Timestamp for TTL - 30 days from createdAt)
-  - [ ] Note: FeedItem contains full post data, no need to fetch post separately
-- [ ] Enable TTL policy in Firestore:
-  - [ ] Go to Google Cloud Console → Firestore → Time-to-live
-  - [ ] Create TTL policy for collection group `items` (under `feeds/{uid}/items`)
-  - [ ] Set TTL field to `expireAt`
-  - [ ] Note: TTL deletions happen within ~24 hours of expiration
-- [ ] Create composite index: `feeds/{uid}/items` with `orderBy(createdAt desc)`
+- [x] Add `feeds/{viewerUid}/items/{postId}` collection structure (created automatically by Cloud Functions)
+- [x] Define FeedItem type as superset of Post:
+  - [x] All Post fields (id, authorId, textBody, media, mediaAspectRatio, createdAt, updatedAt)
+  - [x] postId (explicit field, same as document ID - for easy reference in quotedContent, etc.)
+  - [x] expireAt (required Timestamp for TTL - 30 days from createdAt)
+  - [x] Note: FeedItem contains full post data, no need to fetch post separately
+- [x] Enable TTL policy in Firestore:
+  - [x] Go to Google Cloud Console → Firestore → Time-to-live
+  - [x] Create TTL policy for collection group `items` (under `feeds/{uid}/items`)
+  - [x] Set TTL field to `expireAt`
+  - [x] Note: TTL deletions happen within ~24 hours of expiration
+- [x] Create composite index: `feeds/{uid}/items` with `orderBy(createdAt desc)` (not needed - Firestore auto-creates single-field indexes)
 
 #### Security Rules Updates
 
-- [ ] Add rules for `feeds/{viewerUid}/items/{postId}`:
-  - [ ] Allow read only for owner (`request.auth.uid == viewerUid`)
-  - [ ] Deny all client writes (server-only)
+- [x] Add rules for `feeds/{viewerUid}/items/{postId}`:
+  - [x] Allow read only for owner (`request.auth.uid == viewerUid`)
+  - [x] Deny all client writes (server-only)
 - [ ] Update posts rules if needed (should remain same)
 
 #### Client-Side Implementation
@@ -288,15 +288,15 @@
 
 #### Migration Strategy
 
-- [ ] Enable TTL policy in Firestore:
-  - [ ] Go to Google Cloud Console → Firestore → Time-to-live
-  - [ ] Create TTL policy for collection group `items` (under `feeds/{uid}/items`)
-  - [ ] Set TTL field to `expireAt`
-  - [ ] Wait for policy to become active (may take several minutes)
-- [ ] Deploy Cloud Functions:
-  - [ ] Deploy `onPostCreate` function (fan-out for new posts)
-  - [ ] Deploy `onFriendshipWrite` function (backfill for new friendships)
-  - [ ] Verify functions are active and working
+- [x] Enable TTL policy in Firestore:
+  - [x] Go to Google Cloud Console → Firestore → Time-to-live
+  - [x] Create TTL policy for collection group `items` (under `feeds/{uid}/items`)
+  - [x] Set TTL field to `expireAt`
+  - [x] Wait for policy to become active (may take several minutes)
+- [x] Deploy Cloud Functions:
+  - [x] Deploy `onPostCreate` function (fan-out for new posts)
+  - [x] Deploy `onFriendshipWrite` function (backfill for new friendships)
+  - [x] Verify functions are active and working (tested: post creation successfully fans out to friends' feeds)
 - [ ] Switch FeedScreen to new feed system:
   - [ ] Update FeedScreen to use FeedContext (new feed system)
   - [ ] Test that new posts appear in feed correctly
@@ -305,14 +305,14 @@
 - [ ] Cleanup:
   - [ ] Remove old main feed query code from FeedScreen after migration complete
   - [ ] Keep `useFeedPosts` hook for UserFeedScreen (still needed)
-  - [ ] No backfill needed - only new posts matter
+  - [x] No backfill needed - only new posts matter
 
 #### Testing & Validation
 
-- [ ] Test fan-out on post creation:
-  - [ ] Verify feed items appear in all friends' feeds
-  - [ ] Verify full post data is copied correctly
-  - [ ] Verify expireAt is set correctly (createdAt + 30 days)
+- [x] Test fan-out on post creation:
+  - [x] Verify feed items appear in all friends' feeds
+  - [x] Verify full post data is copied correctly
+  - [x] Verify expireAt is set correctly (createdAt + 30 days)
   - [ ] Test with user having 150 friends
   - [ ] Test error handling (no friends, function failure)
 - [ ] Test backfill on friend add:

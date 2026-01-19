@@ -160,13 +160,31 @@ export function subscribeToDocument<T>(
 
 /**
  * Subscribe to real-time updates for a query
+ * Supports both top-level collections (string) and subcollections (array of path segments)
+ * @param collectionPath - Collection name (string) or subcollection path (array of strings)
+ * @param constraints - Query constraints (where, orderBy, limit, etc.)
+ * @param callback - Callback function that receives the query results
+ * @returns Unsubscribe function
+ *
+ * @example
+ * // Top-level collection
+ * subscribeToQuery('posts', [orderBy('createdAt', 'desc')], (posts) => { ... });
+ *
+ * @example
+ * // Subcollection
+ * subscribeToQuery(['feeds', userId, 'items'], [orderBy('createdAt', 'desc')], (items) => { ... });
  */
 export function subscribeToQuery<T>(
-  collectionName: string,
+  collectionPath: string | string[],
   constraints: QueryConstraint[],
   callback: (data: T[]) => void
 ): Unsubscribe {
-  const collectionRef = collection(db, collectionName);
+  // Handle subcollection paths (array) or top-level collection (string)
+  const collectionRef =
+    typeof collectionPath === 'string'
+      ? collection(db, collectionPath)
+      : collection(db, collectionPath[0], ...collectionPath.slice(1));
+
   const q = query(collectionRef, ...constraints);
 
   return onSnapshot(q, (querySnapshot) => {
