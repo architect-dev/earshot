@@ -158,6 +158,20 @@ service cloud.firestore {
                       isEmailVerified() && 
                       request.auth.uid == resource.data.blockerId;
     }
+    
+    // Feeds collection (fan-out feed items)
+    // Structure: feeds/{viewerUid}/items/{postId}
+    match /feeds/{viewerUid}/items/{postId} {
+      // Only the owner can read their feed items
+      allow read: if isAuthenticated() && 
+                    isEmailVerified() && 
+                    request.auth.uid == viewerUid;
+      
+      // Deny all client writes - only Cloud Functions can write
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
   }
 }
 
