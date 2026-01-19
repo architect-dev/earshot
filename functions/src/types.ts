@@ -2,9 +2,12 @@ import * as admin from 'firebase-admin';
 
 /**
  * FeedItem stored in feeds/{viewerUid}/items/{postId}
- * Contains post data plus expireAt for TTL
+ * Contains minimal post reference data plus expireAt for TTL
  */
-export interface FeedItem extends Post {
+export interface FeedItem {
+  postId: string; // Reference to the post document
+  authorId: string; // Author ID for filtering/enrichment
+  createdAt: admin.firestore.Timestamp; // Post creation timestamp (for ordering)
   expireAt: admin.firestore.Timestamp; // Required: TTL timestamp (30 days from createdAt)
 }
 
@@ -24,6 +27,8 @@ export interface Post {
   textBody: string | null;
   media: PostMedia[];
   mediaAspectRatio?: number;
+  deleted: boolean;
+  deletedAt: admin.firestore.Timestamp | null;
   createdAt: admin.firestore.Timestamp;
   updatedAt: admin.firestore.Timestamp;
 }

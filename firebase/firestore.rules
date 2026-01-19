@@ -11,7 +11,7 @@ service cloud.firestore {
     }
     
     function isEmailVerified() {
-      return isAuthenticated() && request.auth.token.email_verified;
+      return isAuthenticated() && (request.auth.token.email_verified == true);
     }
     
     // Check if two users are friends

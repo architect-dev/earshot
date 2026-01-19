@@ -11,8 +11,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase/config';
 import { subscribeToQuery } from '@/services/firebase/firestore';
+import { getPost } from '@/services/posts';
 import { type FeedItem } from '@/types/feed';
-import { type PostWithAuthor } from '@/types/post';
+import { type Post, type PostWithAuthor } from '@/types/post';
 import { type GetProfileByIdFn } from '@/types/profile';
 
 // Paginated query result
@@ -59,20 +60,60 @@ const HEAD_SIZE = 50; // Real-time subscription limit
 const PAGE_SIZE = 20; // Pagination page size
 
 /**
- * Convert FeedItem to PostWithAuthor by enriching with author profile
+ * Batch fetch posts by IDs
+ * Uses getPost which handles individual document fetching
  */
-function enrichFeedItem(feedItem: FeedItem, getProfileById: GetProfileByIdFn): PostWithAuthor | null {
-  const author = getProfileById(feedItem.authorId);
-  if (!author) return null;
+async function batchFetchPosts(postIds: string[]): Promise<Post[]> {
+  if (postIds.length === 0) return [];
 
-  // Remove FeedItem-specific fields to get Post
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { expireAt, ...post } = feedItem;
+  // Fetch all posts in parallel (Firestore handles batching internally)
+  const postPromises = postIds.map((postId) => getPost(postId));
+  const results = await Promise.allSettled(postPromises);
+
+  // Filter out failed fetches and null results
+  const posts = results
+    .filter((result): result is PromiseFulfilledResult<Post> => result.status === 'fulfilled' && result.value !== null)
+    .map((result) => result.value);
+
+  return posts;
+}
+
+/**
+ * Convert Post to PostWithAuthor by enriching with author profile
+ */
+function enrichPost(post: Post, getProfileById: GetProfileByIdFn): PostWithAuthor | null {
+  const author = getProfileById(post.authorId);
+  if (!author) return null;
 
   return {
     ...post,
     author,
   };
+}
+
+/**
+ * Fetch and enrich posts from feed items
+ */
+async function fetchAndEnrichPosts(feedItems: FeedItem[], getProfileById: GetProfileByIdFn): Promise<PostWithAuthor[]> {
+  // Extract postIds from feed items
+  const postIds = feedItems.map((item) => item.postId);
+
+  // Batch fetch posts
+  const posts = await batchFetchPosts(postIds);
+
+  // Create a map for quick lookup
+  const postsMap = new Map(posts.map((post) => [post.id, post]));
+
+  // Enrich posts with author profiles, maintaining feed item order
+  const enrichedPosts = feedItems
+    .map((item) => {
+      const post = postsMap.get(item.postId);
+      if (!post) return null; // Post not found (deleted or missing)
+      return enrichPost(post, getProfileById);
+    })
+    .filter((post): post is PostWithAuthor => post !== null);
+
+  return enrichedPosts;
 }
 
 export function FeedProvider({ children }: FeedProviderProps) {
@@ -119,26 +160,24 @@ export function FeedProvider({ children }: FeedProviderProps) {
           return;
         }
 
-        // Enrich feed items with author profiles
-        const enrichedPosts = feedItems
-          .map((item) => enrichFeedItem(item, getProfileByIdRef.current))
-          .filter((post): post is PostWithAuthor => post !== null);
+        // Fetch and enrich posts from feed items
+        fetchAndEnrichPosts(feedItems, getProfileByIdRef.current).then((enrichedPosts) => {
+          // Update feed data
+          setFeedData((prev) => {
+            // Check for duplicates in both posts and newPosts
+            const existingPostIds = new Set([...prev.posts.map((p) => p.id), ...prev.newPosts.map((p) => p.id)]);
+            const trulyNewPosts = enrichedPosts.filter((p) => !existingPostIds.has(p.id));
 
-        // Update feed data
-        setFeedData((prev) => {
-          // Check for duplicates in both posts and newPosts
-          const existingPostIds = new Set([...prev.posts.map((p) => p.id), ...prev.newPosts.map((p) => p.id)]);
-          const trulyNewPosts = enrichedPosts.filter((p) => !existingPostIds.has(p.id));
+            // Add new posts to newPosts list (not to posts)
+            const updatedNewPosts = [...prev.newPosts, ...trulyNewPosts].sort(
+              (a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()
+            );
 
-          // Add new posts to newPosts list (not to posts)
-          const updatedNewPosts = [...prev.newPosts, ...trulyNewPosts].sort(
-            (a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()
-          );
-
-          return {
-            ...prev,
-            newPosts: updatedNewPosts,
-          };
+            return {
+              ...prev,
+              newPosts: updatedNewPosts,
+            };
+          });
         });
       }
     );
@@ -162,7 +201,7 @@ export function FeedProvider({ children }: FeedProviderProps) {
       const headSnapshot = await getDocs(headQuery);
 
       const headData = headSnapshot.docs.map((doc) => ({
-        id: doc.id,
+        postId: doc.id, // Document ID is the postId
         ...doc.data(),
       })) as FeedItem[];
 
@@ -172,10 +211,8 @@ export function FeedProvider({ children }: FeedProviderProps) {
         hasMore: headSnapshot.docs.length === HEAD_SIZE,
       };
 
-      // Enrich with author profiles
-      const enrichedHeadPosts = headResult.data
-        .map((item: FeedItem) => enrichFeedItem(item, getProfileById))
-        .filter((post: PostWithAuthor | null): post is PostWithAuthor => post !== null);
+      // Fetch and enrich posts from feed items
+      const enrichedHeadPosts = await fetchAndEnrichPosts(headResult.data, getProfileById);
 
       // Set initial lastSeenAt to most recent post
       const initialLastSeenAt = enrichedHeadPosts.length > 0 ? enrichedHeadPosts[0].createdAt : null;
@@ -218,7 +255,7 @@ export function FeedProvider({ children }: FeedProviderProps) {
       const tailSnapshot = await getDocs(tailQuery);
 
       const tailData = tailSnapshot.docs.map((doc) => ({
-        id: doc.id,
+        postId: doc.id, // Document ID is the postId
         ...doc.data(),
       })) as FeedItem[];
 
@@ -228,10 +265,8 @@ export function FeedProvider({ children }: FeedProviderProps) {
         hasMore: tailSnapshot.docs.length === PAGE_SIZE,
       };
 
-      // Enrich with author profiles
-      const enrichedPosts = result.data
-        .map((item: FeedItem) => enrichFeedItem(item, getProfileById))
-        .filter((post: PostWithAuthor | null): post is PostWithAuthor => post !== null);
+      // Fetch and enrich posts from feed items
+      const enrichedPosts = await fetchAndEnrichPosts(result.data, getProfileById);
 
       // Merge with existing posts (avoid duplicates)
       const existingPostIds = new Set(feedData.posts.map((p) => p.id));

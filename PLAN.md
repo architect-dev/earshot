@@ -255,32 +255,33 @@
 
 #### Client-Side Implementation
 
-- [ ] Create FeedContext (similar to ConversationsContext):
-  - [ ] Support only "main" feed type (NOT user-specific feeds)
-  - [ ] Cache feed data for main feed only
-  - [ ] Real-time subscription for feed head (limit 30-50)
-  - [ ] Pagination for tail using cursor-based `getDocs`
-  - [ ] Track scroll position
-  - [ ] Track `lastSeenAt` timestamp for "N new posts" feature
-  - [ ] Store `unseenNewPosts` array
-- [ ] Update feed service functions:
-  - [ ] `getFeedHead()` - Real-time subscription for main feed
-  - [ ] `getFeedTail(cursor)` - Paginated fetch for main feed
-  - [ ] Note: Subscription callback handles "N new posts" detection (compare new posts to `lastSeenAt`)
+- [x] Create FeedContext (similar to ConversationsContext):
+  - [x] Support only "main" feed type (NOT user-specific feeds)
+  - [x] Cache feed data for main feed only
+  - [x] Real-time subscription for feed head (limit 50)
+  - [x] Pagination for tail using cursor-based `getDocs`
+  - [x] Track `lastSeenAt` timestamp internally (for "N new posts" feature)
+  - [x] Store `newPosts` array (buffered new posts from subscription)
+  - [x] Track `unseenPostsCount` (computed from `newPosts.length`)
+  - [x] Implement `viewNewPosts()` method to merge `newPosts` into `posts`
+  - [x] Enrich FeedItems with author profiles from FriendsContext
+  - [x] Duplicate checking (ensure new posts don't exist in `posts` or `newPosts`)
+- [x] Extended `subscribeToQuery` to support subcollections:
+  - [x] Accepts `string | string[]` for collection path
+  - [x] Supports top-level collections (string) and subcollections (array)
+  - [x] Updated FeedContext to use `subscribeToQuery` with subcollection path
 - [ ] Update FeedScreen to use FeedContext:
   - [ ] Replace `useFeedPosts` hook with `useFeed()` (main feed only)
-  - [ ] Implement real-time head subscription
-  - [ ] Implement paginated tail loading
+  - [ ] Use `posts` from context (real-time head subscription already handled)
+  - [ ] Use `loadMore()` for paginated tail loading
   - [ ] Track scroll position
-  - [ ] Show "N new posts" banner when scrolled down
-  - [ ] Handle banner click (scroll to top, merge unseen posts)
+  - [ ] Show "N new posts" banner when `unseenPostsCount > 0` and user is scrolled down
+  - [ ] Handle banner click: call `viewNewPosts()` and scroll to top
 - [ ] Keep UserFeedScreen unchanged:
   - [ ] Continue using existing `useFeedPosts` hook
   - [ ] Continue using direct posts query (`where('authorId', '==', userId)`)
   - [ ] Do NOT use FeedContext for user-specific feeds
   - [ ] Note: User feeds don't need fan-out since they query posts directly
-- [ ] Update PostDetailScreen:
-  - [ ] Keep using direct post fetch (no feed needed)
 - [ ] Remove old main feed query logic only:
   - [ ] Remove `getFeedPosts` with `where('authorId', 'in', ...)` from FeedScreen
   - [ ] Keep `useFeedPosts` hook for UserFeedScreen (still needed)

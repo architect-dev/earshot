@@ -1,16 +1,16 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import {
   COLLECTIONS,
-  addDocument,
   getDocument,
   updateDocument,
-  deleteDocument,
   queryDocumentsPaginated,
   where,
   orderBy,
   serverTimestamp,
   type DocumentSnapshot,
 } from './firebase/firestore';
+import { doc, setDoc, collection } from 'firebase/firestore';
+import { db } from './firebase/config';
 import { uploadFile, deleteFile, getPostMediaPath } from './firebase/storage';
 import { type Post, type PostMedia, type PostWithAuthor, type GetProfileByIdFn } from '@/types';
 import { type PhotoItem } from '@/components/posts';
@@ -123,25 +123,29 @@ export async function createPost(
     mediaAspectRatio = clampAspectRatio(ratio);
   }
 
-  // Create the post document first to get the ID
-  const postData = {
-    authorId: userId,
-    textBody: textBody?.trim() || null,
-    media: [] as PostMedia[],
-    mediaAspectRatio,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-
-  const postId = await addDocument(COLLECTIONS.POSTS, postData);
+  // Generate a post ID first (without creating the document)
+  // This allows us to upload media using the postId, then create the post with media included
+  const postRef = doc(collection(db, COLLECTIONS.POSTS));
+  const postId = postRef.id;
 
   // Upload media with progress tracking (if any photos)
   let media: PostMedia[] = [];
   if (photos.length > 0) {
     media = await uploadPostMedia(userId, postId, photos, onProgress);
-    // Update the post with media URLs
-    await updateDocument(COLLECTIONS.POSTS, postId, { media });
   }
+
+  // Create the post document with media already included
+  // This ensures the Cloud Function triggers with complete data
+  await setDoc(postRef, {
+    authorId: userId,
+    textBody: textBody?.trim() || null,
+    media,
+    mediaAspectRatio,
+    deleted: false,
+    deletedAt: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 
   // Return the complete post
   const post = await getDocument<Post>(COLLECTIONS.POSTS, postId);
@@ -280,7 +284,7 @@ export async function editPost(
 }
 
 /**
- * Delete a post and its media
+ * Soft delete a post (removes media, clears content, marks as deleted)
  */
 export async function deletePost(postId: string, userId: string): Promise<void> {
   const post = await getPost(postId);
@@ -289,6 +293,10 @@ export async function deletePost(postId: string, userId: string): Promise<void> 
   }
   if (post.authorId !== userId) {
     throw new Error('You can only delete your own posts');
+  }
+  if (post.deleted) {
+    // Already deleted, nothing to do
+    return;
   }
 
   // Delete all media files from storage
@@ -302,8 +310,15 @@ export async function deletePost(postId: string, userId: string): Promise<void> 
     }
   }
 
-  // Delete the post document
-  await deleteDocument(COLLECTIONS.POSTS, postId);
+  // Soft delete: clear content and mark as deleted
+  await updateDocument(COLLECTIONS.POSTS, postId, {
+    media: [],
+    mediaAspectRatio: null,
+    textBody: null,
+    deleted: true,
+    deletedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 /**

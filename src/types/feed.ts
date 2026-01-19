@@ -1,10 +1,12 @@
 import { type Timestamp } from 'firebase/firestore';
-import { type Post } from './post';
 
 /**
  * FeedItem stored in feeds/{viewerUid}/items/{postId}
- * Contains full post data plus expireAt for TTL
+ * Contains minimal post reference data plus expireAt for TTL
  */
-export interface FeedItem extends Post {
+export interface FeedItem {
+  postId: string; // Reference to the post document
+  authorId: string; // Author ID for filtering/enrichment
+  createdAt: Timestamp; // Post creation timestamp (for ordering)
   expireAt: Timestamp; // Required: TTL timestamp (30 days from createdAt)
 }

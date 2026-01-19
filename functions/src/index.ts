@@ -27,14 +27,16 @@ function calculateExpireAt(createdAt: admin.firestore.Timestamp): admin.firestor
 }
 
 /**
- * Create FeedItem from Post
+ * Create FeedItem from Post (minimal fields only)
  */
 function createFeedItem(post: Post): FeedItem {
   const createdAt = post.createdAt || admin.firestore.Timestamp.now();
   const expireAt = calculateExpireAt(createdAt);
 
   return {
-    ...post,
+    postId: post.id,
+    authorId: post.authorId,
+    createdAt,
     expireAt,
   };
 }
@@ -204,6 +206,17 @@ export const onPostCreate = functions.firestore
     const postId = context.params.postId;
     const postData = snap.data();
 
+    // Log raw postData to see what Firestore returns
+    functions.logger.info(`Post ${postId}: Raw postData.media:`, JSON.stringify(postData.media));
+    functions.logger.info(`Post ${postId}: postData.media type:`, typeof postData.media);
+    functions.logger.info(`Post ${postId}: postData.media is array:`, Array.isArray(postData.media));
+    if (Array.isArray(postData.media)) {
+      functions.logger.info(`Post ${postId}: postData.media length:`, postData.media.length);
+      if (postData.media.length > 0) {
+        functions.logger.info(`Post ${postId}: First media item:`, JSON.stringify(postData.media[0]));
+      }
+    }
+
     // Validate post data
     if (!postData.authorId) {
       functions.logger.error(`Post ${postId}: Missing authorId`);
@@ -216,9 +229,15 @@ export const onPostCreate = functions.firestore
       textBody: postData.textBody ?? null,
       media: postData.media ?? [],
       mediaAspectRatio: postData.mediaAspectRatio,
+      deleted: postData.deleted ?? false,
+      deletedAt: postData.deletedAt ?? null,
       createdAt: postData.createdAt || admin.firestore.Timestamp.now(),
       updatedAt: postData.updatedAt || admin.firestore.Timestamp.now(),
     };
+
+    // Log constructed post object
+    functions.logger.info(`Post ${postId}: Constructed post.media:`, JSON.stringify(post.media));
+    functions.logger.info(`Post ${postId}: post.media length:`, post.media.length);
 
     try {
       await fanOutPostToFeeds(post);

@@ -1,35 +1,28 @@
-import { useState, useMemo } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, Alert, ActivityIndicator } from 'react-native';
+import { useState, useRef } from 'react';
+import { View, FlatList, StyleSheet, RefreshControl, Alert, ActivityIndicator, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer, Text, PageHeader, Modal, Button, ConfirmModal, Spacer } from '@/components/ui';
 import { PostCard } from '@/components/posts';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFeed } from '@/contexts/FeedContext';
 import { deletePost } from '@/services/posts';
 import { findOrCreateDM } from '@/services/conversations';
-import { useFriends } from '@/contexts/FriendsContext';
 import { getErrorMessage } from '@/utils/errors';
 import { type PostWithAuthor } from '@/types';
-import { useFeedPosts } from '@/hooks/useFeedPosts';
 
 export default function FeedScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { friendIds, getProfileById, loading: friendsLoading } = useFriends();
   const router = useRouter();
+  const flatListRef = useRef<FlatList>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Calculate feed user IDs (friends + current user)
-  const feedUserIds = useMemo(() => {
-    if (!user) return [];
-    return [...friendIds, user.uid];
-  }, [user, friendIds]);
+  // Use FeedContext for main feed
+  const { posts, loading, loadingMore, hasMore, unseenPostsCount, refresh, loadMore, viewNewPosts } = useFeed();
 
-  // Use the reusable feed hook
-  const { posts, loading, refreshing, loadingMore, refresh, loadMore } = useFeedPosts({
-    userIds: feedUserIds,
-    getProfileById,
-    enabled: user != null && !friendsLoading,
-  });
+  // Calculate if user is scrolled down (more than 400px from top)
+  const showNewPostsBanner = unseenPostsCount > 0;
 
   // Post options state
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
@@ -97,6 +90,21 @@ export default function FeedScreen() {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleViewNewPosts = () => {
+    viewNewPosts();
+    // Scroll to top
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
   const closeModals = () => {
     setShowOptionsModal(false);
     setShowNonOwnerModal(false);
@@ -143,24 +151,36 @@ export default function FeedScreen() {
           <Text color="muted">Loading...</Text>
         </View>
       ) : (
-        <FlatList
-          data={posts}
-          renderItem={renderPost}
-          keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={refresh}
-              tintColor={theme.colors.gold}
-              colors={[theme.colors.gold]}
-            />
-          }
-          ListEmptyComponent={renderEmpty}
-          ListFooterComponent={renderFooter}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          showsVerticalScrollIndicator={false}
-        />
+        <View style={styles.listContainer}>
+          <FlatList
+            ref={flatListRef}
+            data={posts}
+            renderItem={renderPost}
+            keyExtractor={(item) => item.id}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={theme.colors.gold}
+                colors={[theme.colors.gold]}
+              />
+            }
+            ListEmptyComponent={renderEmpty}
+            ListFooterComponent={renderFooter}
+            onEndReached={hasMore ? loadMore : undefined}
+            onEndReachedThreshold={0.5}
+            showsVerticalScrollIndicator={false}
+          />
+
+          {/* "N new posts" banner */}
+          {showNewPostsBanner && (
+            <Pressable style={styles.newPostsBanner} onPress={handleViewNewPosts}>
+              <Text size="sm" weight="semibold" color="base">
+                {unseenPostsCount} new post{unseenPostsCount !== 1 ? 's' : ''}
+              </Text>
+            </Pressable>
+          )}
+        </View>
       )}
 
       {/* Post Options Modal (Owner) */}
@@ -204,6 +224,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  listContainer: {
+    flex: 1,
+    position: 'relative',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -220,5 +244,20 @@ const styles = StyleSheet.create({
   footerLoader: {
     paddingVertical: 20,
     alignItems: 'center',
+  },
+  newPostsBanner: {
+    position: 'absolute',
+    top: 16,
+    alignSelf: 'center',
+    backgroundColor: '#FFD700', // gold color
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
   },
 });
